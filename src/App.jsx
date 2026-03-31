@@ -7,19 +7,21 @@ import PantryTab from './components/PantryTab.jsx'
 import ShoppingTab from './components/ShoppingTab.jsx'
 import RecipesTab from './components/RecipesTab.jsx'
 import AssistantTab from './components/AssistantTab.jsx'
+import SettingsTab from './components/SettingsTab.jsx'
 
 const TABS = [
   { id: 'pantry', label: 'Pantry', icon: '🥦' },
   { id: 'shopping', label: 'Shopping', icon: '🛒' },
   { id: 'recipes', label: 'Recipes', icon: '👨‍🍳' },
   { id: 'assistant', label: 'Assistant', icon: '💬' },
+  { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('pantry')
   const [pantry, setPantry] = useLocalStorage('pantry_v1', INITIAL_PANTRY)
   const [shoppingList, setShoppingList] = useLocalStorage('shopping_v1', INITIAL_SHOPPING_LIST)
-  const [preferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
+  const [preferences, setPreferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
 
   const appState = { pantry, shoppingList, preferences }
 
@@ -45,6 +47,14 @@ export default function App() {
 
   const deleteShoppingItem = (id) =>
     setShoppingList(prev => prev.filter(i => i.id !== id))
+
+  // Settings actions
+  const updatePreferences = (updated) => setPreferences(updated)
+
+  const resetData = () => {
+    setPantry(INITIAL_PANTRY)
+    setShoppingList(INITIAL_SHOPPING_LIST)
+  }
 
   // AI state change (from assistant)
   const handleStateChange = (nextState) => {
@@ -87,6 +97,13 @@ export default function App() {
           <AssistantTab
             appState={appState}
             onStateChange={handleStateChange}
+          />
+        )}
+        {activeTab === 'settings' && (
+          <SettingsTab
+            preferences={preferences}
+            onUpdate={updatePreferences}
+            onResetData={resetData}
           />
         )}
       </div>
