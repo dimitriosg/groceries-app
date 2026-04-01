@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { callAssistant } from '../utils/assistant.js'
 import { applyActions } from '../utils/actions.js'
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition.js'
 
 const QUICK_CHIPS = [
   "What can I cook tonight?",
@@ -68,6 +69,11 @@ export default function AssistantTab({ appState, onStateChange }) {
   const [error, setError] = useState(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+
+  const handleVoiceResult = useCallback((text) => {
+    setInput(prev => prev ? `${prev} ${text}` : text)
+  }, [])
+  const { supported: voiceSupported, listening, permissionDenied: micDenied, start: startListening, stop: stopListening } = useSpeechRecognition(handleVoiceResult)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -226,7 +232,32 @@ export default function AssistantTab({ appState, onStateChange }) {
             ⚠️ Add VITE_ANTHROPIC_API_KEY to your .env file to enable AI
           </div>
         )}
+        {micDenied && (
+          <div style={{ fontSize: 12, color: 'var(--color-expiry)', marginBottom: 8, textAlign: 'center' }}>
+            🎤 Microphone access denied
+          </div>
+        )}
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          {voiceSupported && (
+            <button
+              type="button"
+              onClick={listening ? stopListening : startListening}
+              style={{
+                width: 40, height: 40,
+                borderRadius: '50%',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 18,
+                flexShrink: 0,
+                background: listening ? '#EF4444' : 'var(--color-surface-2)',
+                animation: listening ? 'mic-pulse 1s ease-in-out infinite' : 'none',
+                transition: 'background 0.15s',
+              }}
+            >
+              🎤
+            </button>
+          )}
           <textarea
             ref={inputRef}
             value={input}
@@ -285,6 +316,10 @@ export default function AssistantTab({ appState, onStateChange }) {
         @keyframes pulse {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1.1); }
+        }
+        @keyframes mic-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+          50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
         }
       `}</style>
     </div>
