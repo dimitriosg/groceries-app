@@ -24,7 +24,7 @@ const TABS = [
 function SyncIndicator({ status, shared }) {
   const colors = {
     idle: '#D1D5DB',
-    syncing: '#22c55e',
+    syncing: '#3B82F6',
     synced: '#22c55e',
     error: '#EF4444',
   }
@@ -94,18 +94,29 @@ export default function App() {
 
   // ── Supabase: pull + subscribe whenever householdId changes ────
   useEffect(() => {
-    // Initial pull
+    // Initial pull — remote wins if it has data; otherwise seed it from local
     async function init() {
       try {
         setSyncStatus('syncing')
         const remote = await pullFromSupabase(householdId)
-        if (remote.pantry) { isRemoteUpdateRef.current = true; setPantry(remote.pantry) }
-        if (remote.shoppingList) { isRemoteUpdateRef.current = true; setShoppingList(remote.shoppingList) }
+
+        const hasRemotePantry = Array.isArray(remote.pantry) && remote.pantry.length > 0
+        const hasRemoteShopping = Array.isArray(remote.shoppingList) && remote.shoppingList.length > 0
+
+        if (hasRemotePantry || hasRemoteShopping) {
+          // Remote has data — use it, overwrite local
+          if (hasRemotePantry) { isRemoteUpdateRef.current = true; setPantry(remote.pantry) }
+          if (hasRemoteShopping) { isRemoteUpdateRef.current = true; setShoppingList(remote.shoppingList) }
+        } else {
+          // Remote is empty — seed it from localStorage so the second device gets our data
+          await pushToSupabase(pantryRef.current, shoppingRef.current)
+        }
+
         setSyncStatus('synced')
-        setTimeout(() => setSyncStatus('idle'), 2000)
-      } catch {
-        setSyncStatus('error')
         setTimeout(() => setSyncStatus('idle'), 3000)
+      } catch {
+        // Offline — fall back to localStorage silently
+        setSyncStatus('idle')
       }
     }
     init()
@@ -134,7 +145,9 @@ export default function App() {
             }
           }
         )
-        .subscribe()
+        .subscribe((status) => {
+          console.log('Realtime status:', status)
+        })
     } catch {
       // Fail silently — realtime is an enhancement
     }
@@ -158,13 +171,36 @@ export default function App() {
         setSyncStatus('syncing')
         await pushToSupabase(pantryRef.current, shoppingRef.current)
         setSyncStatus('synced')
-        setTimeout(() => setSyncStatus('idle'), 2000)
+        setTimeout(() => setSyncStatus('idle'), 3000)
       } catch {
         setSyncStatus('error')
         setTimeout(() => setSyncStatus('idle'), 3000)
       }
     }, 2000)
   }, [pantry, shoppingList])
+
+  // ── Manual sync ────────────────────────────────────────────────
+  const handleSyncNow = async () => {
+    try {
+      setSyncStatus('syncing')
+      const remote = await pullFromSupabase(householdId)
+      if (Array.isArray(remote.pantry) && remote.pantry.length > 0) {
+        isRemoteUpdateRef.current = true
+        setPantry(remote.pantry)
+      }
+      if (Array.isArray(remote.shoppingList) && remote.shoppingList.length > 0) {
+        isRemoteUpdateRef.current = true
+        setShoppingList(remote.shoppingList)
+      }
+      setSyncStatus('synced')
+      setTimeout(() => setSyncStatus('idle'), 3000)
+      return true
+    } catch {
+      setSyncStatus('error')
+      setTimeout(() => setSyncStatus('idle'), 3000)
+      return false
+    }
+  }
 
   // ── Join household ─────────────────────────────────────────────
   const handleJoinHousehold = async (newId) => {
@@ -284,6 +320,7 @@ export default function App() {
             onResetData={resetData}
             householdId={householdId}
             onJoinHousehold={handleJoinHousehold}
+            onSyncNow={handleSyncNow}
           />
         )}
       </div>

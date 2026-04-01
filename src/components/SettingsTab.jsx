@@ -11,9 +11,10 @@ const SKILL_LEVELS = [
   { value: 'advanced', label: 'Advanced' },
 ]
 
-export default function SettingsTab({ preferences, onUpdate, onResetData, householdId, onJoinHousehold }) {
+export default function SettingsTab({ preferences, onUpdate, onResetData, householdId, onJoinHousehold, onSyncNow }) {
   const [joinInput, setJoinInput] = useState('')
   const [copied, setCopied] = useState(false)
+  const [syncFeedback, setSyncFeedback] = useState('')
 
   function update(key, value) {
     onUpdate({ ...preferences, [key]: value })
@@ -38,6 +39,13 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
+  }
+
+  async function handleSyncNow() {
+    setSyncFeedback('syncing')
+    const ok = await onSyncNow()
+    setSyncFeedback(ok ? 'done' : 'error')
+    setTimeout(() => setSyncFeedback(''), 3000)
   }
 
   function handleJoin() {
@@ -92,6 +100,22 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
               Join
             </button>
           </div>
+        </div>
+        <div style={{ padding: '8px 0', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 13, padding: '5px 12px' }}
+            disabled={syncFeedback === 'syncing'}
+            onClick={handleSyncNow}
+          >
+            {syncFeedback === 'syncing' ? 'Syncing…' : 'Sync now'}
+          </button>
+          {syncFeedback === 'done' && (
+            <span style={{ fontSize: 13, color: 'var(--color-primary)' }}>Synced ✓</span>
+          )}
+          {syncFeedback === 'error' && (
+            <span style={{ fontSize: 13, color: 'var(--color-expiry)' }}>Failed ✗</span>
+          )}
         </div>
       </Section>
 
