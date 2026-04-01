@@ -5,6 +5,7 @@ import { INITIAL_PANTRY, INITIAL_SHOPPING_LIST, INITIAL_PREFERENCES, INITIAL_REC
 import { applyActions } from './utils/actions.js'
 import { requestPermission, checkPantryAlerts, sendNotification } from './utils/notifications.js'
 import { pushToSupabase, pullFromSupabase } from './utils/sync.js'
+import { supabase, getOrCreateUserId } from './utils/supabase.js'
 import PantryTab from './components/PantryTab.jsx'
 import ShoppingTab from './components/ShoppingTab.jsx'
 import RecipesTab from './components/RecipesTab.jsx'
@@ -55,6 +56,7 @@ export default function App() {
   const debounceRef = useRef(null)
   const pantryRef = useRef(pantry)
   const shoppingRef = useRef(shoppingList)
+  const isRemoteUpdateRef = useRef(false)
   pantryRef.current = pantry
   shoppingRef.current = shoppingList
 
@@ -94,8 +96,59 @@ export default function App() {
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Supabase: Realtime subscriptions ──────────────────────────
+  useEffect(() => {
+    let pantryChannel
+    let shoppingChannel
+
+    async function subscribe() {
+      try {
+        const userId = await getOrCreateUserId()
+
+        pantryChannel = supabase
+          .channel('pantry-changes')
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'pantry', filter: `id=eq.${userId}` },
+            (payload) => {
+              isRemoteUpdateRef.current = true
+              setPantry(payload.new.data)
+            }
+          )
+          .subscribe()
+
+        shoppingChannel = supabase
+          .channel('shopping-changes')
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'shopping_list', filter: `id=eq.${userId}` },
+            (payload) => {
+              isRemoteUpdateRef.current = true
+              setShoppingList(payload.new.data)
+            }
+          )
+          .subscribe()
+      } catch {
+        // Fail silently — realtime is an enhancement, not required
+      }
+    }
+
+    subscribe()
+
+    return () => {
+      try {
+        if (pantryChannel) supabase.removeChannel(pantryChannel)
+        if (shoppingChannel) supabase.removeChannel(shoppingChannel)
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Supabase: debounced push on data change ────────────────────
   useEffect(() => {
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false
+      return
+    }
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       try {
