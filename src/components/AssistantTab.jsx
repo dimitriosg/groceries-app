@@ -113,14 +113,15 @@ export default function AssistantTab({ appState, onStateChange }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, position: 'relative' }}>
       {/* Messages area */}
       <div style={{
         flex: 1,
+        minHeight: 0,
         overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
         paddingTop: 16,
-        paddingBottom: 100,
-        '-webkit-overflow-scrolling': 'touch',
+        paddingBottom: 'calc(var(--tab-height) + var(--safe-bottom) + 100px)',
       }}>
         <div style={{ padding: '0 4px 8px', textAlign: 'center' }}>
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>
@@ -179,7 +180,7 @@ export default function AssistantTab({ appState, onStateChange }) {
       {messages.length <= 1 && (
         <div style={{
           position: 'absolute',
-          bottom: 80,
+          bottom: 'calc(var(--tab-height) + var(--safe-bottom) + 80px)',
           left: 0, right: 0,
           padding: '0 16px 8px',
           display: 'flex',
@@ -213,7 +214,8 @@ export default function AssistantTab({ appState, onStateChange }) {
       {/* Input bar */}
       <div style={{
         position: 'absolute',
-        bottom: 0, left: 0, right: 0,
+        bottom: 'calc(var(--tab-height) + var(--safe-bottom))',
+        left: 0, right: 0,
         padding: '10px 12px',
         background: 'var(--color-bg)',
         borderTop: '1px solid var(--color-border)',

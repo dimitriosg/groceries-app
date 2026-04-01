@@ -62,6 +62,7 @@ body {
 /* Scrollable content area above tab bar */
 .tab-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-bottom: calc(var(--tab-height) + var(--safe-bottom) + 16px);
   -webkit-overflow-scrolling: touch;
