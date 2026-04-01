@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 const CUISINES = [
   'Italian', 'Asian', 'Mediterranean', 'Mexican',
   'Middle Eastern', 'French', 'Indian', 'American', 'Greek',
@@ -9,7 +11,10 @@ const SKILL_LEVELS = [
   { value: 'advanced', label: 'Advanced' },
 ]
 
-export default function SettingsTab({ preferences, onUpdate, onResetData }) {
+export default function SettingsTab({ preferences, onUpdate, onResetData, householdId, onJoinHousehold }) {
+  const [joinInput, setJoinInput] = useState('')
+  const [copied, setCopied] = useState(false)
+
   function update(key, value) {
     onUpdate({ ...preferences, [key]: value })
   }
@@ -28,11 +33,67 @@ export default function SettingsTab({ preferences, onUpdate, onResetData }) {
     }
   }
 
+  function handleCopyInviteCode() {
+    navigator.clipboard.writeText(householdId).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function handleJoin() {
+    const trimmed = joinInput.trim()
+    if (!trimmed) return
+    if (window.confirm('This will replace your current pantry and shopping list with the shared household data. Continue?')) {
+      onJoinHousehold(trimmed)
+      setJoinInput('')
+    }
+  }
+
   return (
     <div className="tab-content">
       <div className="page-header">
         <h1 className="page-title">Settings</h1>
       </div>
+
+      {/* ── Household Sync ── */}
+      <Section title="Household Sync">
+        <Row label="Your household ID">
+          <span style={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 1, color: 'var(--color-text-muted)' }}>
+            {householdId ? householdId.slice(0, 8) : '—'}
+          </span>
+        </Row>
+        <Row label="Invite code">
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 13, padding: '5px 12px' }}
+            onClick={handleCopyInviteCode}
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </Row>
+        <div style={{ padding: '12px 0', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+            Join a household — paste an invite code from another device:
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="form-input"
+              style={{ flex: 1, fontFamily: 'monospace', fontSize: 13 }}
+              placeholder="Paste household ID…"
+              value={joinInput}
+              onChange={e => setJoinInput(e.target.value)}
+            />
+            <button
+              className="btn btn-primary"
+              style={{ flexShrink: 0 }}
+              disabled={!joinInput.trim()}
+              onClick={handleJoin}
+            >
+              Join
+            </button>
+          </div>
+        </div>
+      </Section>
 
       {/* ── Household ── */}
       <Section title="Household">

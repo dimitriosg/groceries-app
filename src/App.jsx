@@ -5,7 +5,7 @@ import { INITIAL_PANTRY, INITIAL_SHOPPING_LIST, INITIAL_PREFERENCES, INITIAL_REC
 import { applyActions } from './utils/actions.js'
 import { requestPermission, checkPantryAlerts, sendNotification } from './utils/notifications.js'
 import { pushToSupabase, pullFromSupabase } from './utils/sync.js'
-import { supabase, getOrCreateUserId } from './utils/supabase.js'
+import { supabase, getOrCreateHouseholdId } from './utils/supabase.js'
 import PantryTab from './components/PantryTab.jsx'
 import ShoppingTab from './components/ShoppingTab.jsx'
 import RecipesTab from './components/RecipesTab.jsx'
@@ -21,7 +21,7 @@ const TABS = [
 ]
 
 // status: 'idle' | 'syncing' | 'synced' | 'error'
-function SyncDot({ status }) {
+function SyncIndicator({ status, shared }) {
   const colors = {
     idle: '#D1D5DB',
     syncing: '#22c55e',
@@ -31,17 +31,26 @@ function SyncDot({ status }) {
   return (
     <div style={{
       position: 'fixed',
-      top: 14,
-      right: 16,
+      top: 10,
+      right: 14,
       zIndex: 200,
-      width: 10,
-      height: 10,
-      borderRadius: '50%',
-      background: colors[status] ?? colors.idle,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
       pointerEvents: 'none',
-      animation: status === 'syncing' ? 'sync-pulse 1s ease-in-out infinite' : 'none',
-      transition: 'background 0.3s',
-    }} />
+    }}>
+      {shared && (
+        <span style={{ fontSize: 12, lineHeight: 1 }}>👥</span>
+      )}
+      <div style={{
+        width: 10,
+        height: 10,
+        borderRadius: '50%',
+        background: colors[status] ?? colors.idle,
+        animation: status === 'syncing' ? 'sync-pulse 1s ease-in-out infinite' : 'none',
+        transition: 'background 0.3s',
+      }} />
+    </div>
   )
 }
 
@@ -52,15 +61,20 @@ export default function App() {
   const [recipes, setRecipes] = useLocalStorage('recipes_v1', INITIAL_RECIPES)
   const [preferences, setPreferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
   const [syncStatus, setSyncStatus] = useState('idle')
+  const [householdId, setHouseholdId] = useState(() => getOrCreateHouseholdId())
 
   const debounceRef = useRef(null)
   const pantryRef = useRef(pantry)
   const shoppingRef = useRef(shoppingList)
   const isRemoteUpdateRef = useRef(false)
+  const channelRef = useRef(null)
   pantryRef.current = pantry
   shoppingRef.current = shoppingList
 
   const appState = { pantry, shoppingList, preferences }
+
+  // Whether this device has joined a shared household (not a freshly generated ID)
+  const isSharedHousehold = localStorage.getItem('household_joined') === 'true'
 
   // ── Notifications ──────────────────────────────────────────────
   useEffect(() => {
@@ -78,14 +92,15 @@ export default function App() {
     return () => clearInterval(interval)
   }, [pantry, preferences.notificationsEnabled])
 
-  // ── Supabase: initial pull on mount ───────────────────────────
+  // ── Supabase: pull + subscribe whenever householdId changes ────
   useEffect(() => {
+    // Initial pull
     async function init() {
       try {
         setSyncStatus('syncing')
-        const remote = await pullFromSupabase()
-        if (remote.pantry) setPantry(remote.pantry)
-        if (remote.shoppingList) setShoppingList(remote.shoppingList)
+        const remote = await pullFromSupabase(householdId)
+        if (remote.pantry) { isRemoteUpdateRef.current = true; setPantry(remote.pantry) }
+        if (remote.shoppingList) { isRemoteUpdateRef.current = true; setShoppingList(remote.shoppingList) }
         setSyncStatus('synced')
         setTimeout(() => setSyncStatus('idle'), 2000)
       } catch {
@@ -94,56 +109,44 @@ export default function App() {
       }
     }
     init()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Supabase: Realtime subscriptions ──────────────────────────
-  useEffect(() => {
-    let pantryChannel
-    let shoppingChannel
+    // Realtime subscription
+    try {
+      if (channelRef.current) supabase.removeChannel(channelRef.current)
 
-    async function subscribe() {
-      try {
-        const userId = await getOrCreateUserId()
-
-        pantryChannel = supabase
-          .channel('pantry-changes')
-          .on('postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'pantry', filter: `id=eq.${userId}` },
-            (payload) => {
+      channelRef.current = supabase
+        .channel('household-sync')
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'pantry', filter: `id=eq.${householdId}` },
+          (payload) => {
+            if (payload.new?.data) {
               isRemoteUpdateRef.current = true
               setPantry(payload.new.data)
             }
-          )
-          .subscribe()
-
-        shoppingChannel = supabase
-          .channel('shopping-changes')
-          .on('postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'shopping_list', filter: `id=eq.${userId}` },
-            (payload) => {
+          }
+        )
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'shopping_list', filter: `id=eq.${householdId}` },
+          (payload) => {
+            if (payload.new?.data) {
               isRemoteUpdateRef.current = true
               setShoppingList(payload.new.data)
             }
-          )
-          .subscribe()
-      } catch {
-        // Fail silently — realtime is an enhancement, not required
-      }
+          }
+        )
+        .subscribe()
+    } catch {
+      // Fail silently — realtime is an enhancement
     }
-
-    subscribe()
 
     return () => {
       try {
-        if (pantryChannel) supabase.removeChannel(pantryChannel)
-        if (shoppingChannel) supabase.removeChannel(shoppingChannel)
-      } catch {
-        // ignore cleanup errors
-      }
+        if (channelRef.current) supabase.removeChannel(channelRef.current)
+      } catch { /* ignore */ }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [householdId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Supabase: debounced push on data change ────────────────────
+  // ── Supabase: debounced push on local data change ──────────────
   useEffect(() => {
     if (isRemoteUpdateRef.current) {
       isRemoteUpdateRef.current = false
@@ -162,6 +165,14 @@ export default function App() {
       }
     }, 2000)
   }, [pantry, shoppingList])
+
+  // ── Join household ─────────────────────────────────────────────
+  const handleJoinHousehold = async (newId) => {
+    localStorage.setItem('household_id_v1', newId)
+    localStorage.setItem('household_joined', 'true')
+    setHouseholdId(newId)
+    // Data will be pulled in the householdId effect above
+  }
 
   // ── Pantry actions ─────────────────────────────────────────────
   const addPantryItem = (item) => setPantry(prev => [...prev, item])
@@ -217,7 +228,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
-      <SyncDot status={syncStatus} />
+      <SyncIndicator status={syncStatus} shared={isSharedHousehold} />
 
       <style>{`
         @keyframes sync-pulse {
@@ -271,6 +282,8 @@ export default function App() {
             preferences={preferences}
             onUpdate={updatePreferences}
             onResetData={resetData}
+            householdId={householdId}
+            onJoinHousehold={handleJoinHousehold}
           />
         )}
       </div>
