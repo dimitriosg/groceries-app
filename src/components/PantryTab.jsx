@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { CATEGORY_ICONS } from '../constants.js'
 import AddItemModal from './AddItemModal.jsx'
 import EditItemModal from './EditItemModal.jsx'
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition.js'
 
 function isLowStock(item) {
   return item.quantity <= item.lowStockThreshold
@@ -88,10 +89,13 @@ function PantryCard({ item, onClick }) {
   )
 }
 
-export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteItem }) {
+export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteItem, onDeleteAll, onDeleteCategory }) {
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState(null)
+
+  const handleVoiceSearch = useCallback((text) => setSearch(text), [])
+  const { supported: voiceSupported, listening: voiceListening, permissionDenied: micDenied, start: startVoice, stop: stopVoice } = useSpeechRecognition(handleVoiceSearch)
 
   const filtered = pantry.filter(i =>
     i.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -108,11 +112,37 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
   const lowCount = pantry.filter(i => isLowStock(i)).length
   const expiringCount = pantry.filter(i => isExpiringSoon(i) || isExpired(i)).length
 
+  function handleClearAll() {
+    if (window.confirm(`Delete all ${pantry.length} pantry items? This cannot be undone.`)) {
+      onDeleteAll()
+    }
+  }
+
+  function handleDeleteCategory(category) {
+    if (window.confirm(`Delete all items in ${category}?`)) {
+      onDeleteCategory(category)
+    }
+  }
+
   return (
     <>
       <div className="tab-content">
         <div className="page-header">
-          <h1 className="page-title">Pantry</h1>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <h1 className="page-title">Pantry</h1>
+            {pantry.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 13, color: 'var(--color-text-muted)',
+                  padding: '2px 0', fontFamily: 'var(--font-body)',
+                }}
+              >
+                Clear all
+              </button>
+            )}
+          </div>
           <p className="page-subtitle">
             {pantry.length} items
             {lowCount > 0 && <span style={{ color: 'var(--color-low-stock)', marginLeft: 8 }}>· {lowCount} low</span>}
@@ -121,16 +151,38 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
         </div>
 
         <div className="search-bar">
-          <span style={{ fontSize: 16 }}>🔍</span>
+          <span style={{ fontSize: 16 }}>{voiceListening ? '🎤' : '🔍'}</span>
           <input
-            placeholder="Search pantry..."
+            placeholder={voiceListening ? 'Listening…' : 'Search pantry...'}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          {search && (
+          {micDenied && (
+            <span style={{ fontSize: 11, color: 'var(--color-expiry)', whiteSpace: 'nowrap' }}>Access denied</span>
+          )}
+          {search && !micDenied && (
             <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--color-text-muted)' }}>✕</button>
           )}
+          {voiceSupported && (
+            <button
+              onClick={voiceListening ? stopVoice : startVoice}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 16, padding: '0 2px',
+                color: voiceListening ? '#EF4444' : 'var(--color-text-muted)',
+                animation: voiceListening ? 'mic-pulse-search 1s ease-in-out infinite' : 'none',
+              }}
+            >
+              🎤
+            </button>
+          )}
         </div>
+        <style>{`
+          @keyframes mic-pulse-search {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
 
         {filtered.length === 0 ? (
           <div className="empty-state">
@@ -141,8 +193,19 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
         ) : (
           Object.entries(grouped).map(([category, items]) => (
             <div key={category}>
-              <div className="section-label">
-                {CATEGORY_ICONS[category]} {category}
+              <div className="section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
+                <span>{CATEGORY_ICONS[category]} {category}</span>
+                <button
+                  onClick={() => handleDeleteCategory(category)}
+                  title={`Delete all ${category} items`}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 14, color: 'var(--color-text-muted)',
+                    padding: '0 2px', lineHeight: 1,
+                  }}
+                >
+                  🗑
+                </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px' }}>
                 {items.map(item => (

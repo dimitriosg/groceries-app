@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { callAssistant } from '../utils/assistant.js'
 import { applyActions } from '../utils/actions.js'
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition.js'
 
 const QUICK_CHIPS = [
   "What can I cook tonight?",
@@ -69,6 +70,11 @@ export default function AssistantTab({ appState, onStateChange }) {
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
+  const handleVoiceResult = useCallback((text) => {
+    setInput(prev => prev ? `${prev} ${text}` : text)
+  }, [])
+  const { supported: voiceSupported, listening, permissionDenied: micDenied, start: startListening, stop: stopListening } = useSpeechRecognition(handleVoiceResult)
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -113,14 +119,15 @@ export default function AssistantTab({ appState, onStateChange }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, position: 'relative' }}>
       {/* Messages area */}
       <div style={{
         flex: 1,
+        minHeight: 0,
         overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
         paddingTop: 16,
-        paddingBottom: 100,
-        '-webkit-overflow-scrolling': 'touch',
+        paddingBottom: 'calc(var(--tab-height) + var(--safe-bottom) + 100px)',
       }}>
         <div style={{ padding: '0 4px 8px', textAlign: 'center' }}>
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>
@@ -179,7 +186,7 @@ export default function AssistantTab({ appState, onStateChange }) {
       {messages.length <= 1 && (
         <div style={{
           position: 'absolute',
-          bottom: 80,
+          bottom: 'calc(var(--tab-height) + var(--safe-bottom) + 80px)',
           left: 0, right: 0,
           padding: '0 16px 8px',
           display: 'flex',
@@ -213,7 +220,8 @@ export default function AssistantTab({ appState, onStateChange }) {
       {/* Input bar */}
       <div style={{
         position: 'absolute',
-        bottom: 0, left: 0, right: 0,
+        bottom: 'calc(var(--tab-height) + var(--safe-bottom))',
+        left: 0, right: 0,
         padding: '10px 12px',
         background: 'var(--color-bg)',
         borderTop: '1px solid var(--color-border)',
@@ -224,7 +232,32 @@ export default function AssistantTab({ appState, onStateChange }) {
             ⚠️ Add VITE_ANTHROPIC_API_KEY to your .env file to enable AI
           </div>
         )}
+        {micDenied && (
+          <div style={{ fontSize: 12, color: 'var(--color-expiry)', marginBottom: 8, textAlign: 'center' }}>
+            🎤 Microphone access denied
+          </div>
+        )}
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          {voiceSupported && (
+            <button
+              type="button"
+              onClick={listening ? stopListening : startListening}
+              style={{
+                width: 40, height: 40,
+                borderRadius: '50%',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 18,
+                flexShrink: 0,
+                background: listening ? '#EF4444' : 'var(--color-surface-2)',
+                animation: listening ? 'mic-pulse 1s ease-in-out infinite' : 'none',
+                transition: 'background 0.15s',
+              }}
+            >
+              🎤
+            </button>
+          )}
           <textarea
             ref={inputRef}
             value={input}
@@ -283,6 +316,10 @@ export default function AssistantTab({ appState, onStateChange }) {
         @keyframes pulse {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1.1); }
+        }
+        @keyframes mic-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+          50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
         }
       `}</style>
     </div>

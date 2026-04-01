@@ -6,7 +6,7 @@ const SKILL_COLORS = {
   advanced: { bg: '#FFF0EE', text: '#D94F3D' },
 }
 
-function RecipeCard({ recipe, pantry, onAddMissing }) {
+function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selected, onToggleSelect }) {
   const [expanded, setExpanded] = useState(false)
 
   const pantryNames = pantry.map(i => i.name.toLowerCase())
@@ -17,8 +17,33 @@ function RecipeCard({ recipe, pantry, onAddMissing }) {
   const skill = SKILL_COLORS[recipe.skillLevel] || SKILL_COLORS.beginner
 
   return (
-    <div className="card" style={{ margin: '0 20px', padding: '16px' }}>
+    <div
+      className="card"
+      style={{
+        margin: '0 20px',
+        padding: '16px',
+        outline: selected ? '2px solid var(--color-primary)' : 'none',
+        transition: 'outline 0.1s',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        {/* Checkbox (select mode) or expand chevron */}
+        {selecting ? (
+          <button
+            onClick={() => onToggleSelect(recipe.id)}
+            style={{
+              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+              border: `2px solid ${selected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+              background: selected ? 'var(--color-primary)' : 'transparent',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.15s', marginTop: 2,
+            }}
+          >
+            {selected && <span style={{ color: 'white', fontSize: 12, fontWeight: 700 }}>✓</span>}
+          </button>
+        ) : null}
+
         <div style={{ flex: 1 }}>
           <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, lineHeight: 1.3 }}>
             {recipe.title}
@@ -44,15 +69,37 @@ function RecipeCard({ recipe, pantry, onAddMissing }) {
             )}
           </div>
         </div>
-        <button
-          onClick={() => setExpanded(e => !e)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--color-text-muted)', transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }}
-        >
-          ⌄
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {!selecting && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Delete "${recipe.title}"?`)) onDelete(recipe.id)
+              }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 16, color: 'var(--color-text-muted)', padding: '2px 4px',
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          )}
+          <button
+            onClick={() => !selecting && setExpanded(e => !e)}
+            style={{
+              background: 'none', border: 'none', cursor: selecting ? 'default' : 'pointer',
+              fontSize: 20, color: 'var(--color-text-muted)',
+              transition: 'transform 0.2s',
+              transform: expanded && !selecting ? 'rotate(180deg)' : 'none',
+            }}
+          >
+            ⌄
+          </button>
+        </div>
       </div>
 
-      {expanded && (
+      {expanded && !selecting && (
         <div style={{ marginTop: 14, borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 8 }}>
@@ -98,92 +145,135 @@ function RecipeCard({ recipe, pantry, onAddMissing }) {
   )
 }
 
-const SAMPLE_RECIPES = [
-  {
-    id: 'r1',
-    title: 'Spaghetti alla Carbonara',
-    cuisine: 'Italian',
-    skillLevel: 'intermediate',
-    servings: 2,
-    estimatedTimeMinutes: 25,
-    ingredients: [
-      { name: 'Pasta (Spaghetti)', quantity: 200, unit: 'g' },
-      { name: 'Pancetta', quantity: 100, unit: 'g' },
-      { name: 'Eggs', quantity: 3, unit: 'units' },
-      { name: 'Parmesan', quantity: 50, unit: 'g' },
-      { name: 'Black Pepper', quantity: 1, unit: 'tsp' },
-      { name: 'Sea Salt', quantity: 1, unit: 'tsp' },
-    ],
-    steps: [
-      'Bring a large pot of salted water to a boil. Cook spaghetti until al dente.',
-      'In a bowl, whisk together eggs, grated parmesan, and plenty of black pepper.',
-      'Fry pancetta in a pan until crispy. Reserve the fat.',
-      'Drain pasta, reserving a cup of pasta water.',
-      'Off the heat, toss pasta with pancetta and fat, then quickly add egg mixture.',
-      'Add pasta water gradually to create a creamy sauce. Season and serve immediately.',
-    ],
-    source: 'ai-generated',
-  },
-  {
-    id: 'r2',
-    title: 'Cherry Tomato Bruschetta',
-    cuisine: 'Italian',
-    skillLevel: 'beginner',
-    servings: 2,
-    estimatedTimeMinutes: 15,
-    ingredients: [
-      { name: 'Cherry Tomatoes', quantity: 200, unit: 'g' },
-      { name: 'Garlic', quantity: 2, unit: 'units' },
-      { name: 'Olive Oil', quantity: 3, unit: 'tbsp' },
-      { name: 'Sea Salt', quantity: 0.5, unit: 'tsp' },
-      { name: 'Sourdough Bread', quantity: 4, unit: 'slices' },
-    ],
-    steps: [
-      'Halve the cherry tomatoes and mince the garlic.',
-      'Toss tomatoes with olive oil, garlic, salt, and pepper. Let sit 10 minutes.',
-      'Toast or grill the bread slices until golden.',
-      'Rub toast with a cut garlic clove, then spoon the tomato mixture over.',
-      'Drizzle with extra olive oil and serve immediately.',
-    ],
-    source: 'ai-generated',
-  },
-]
+export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDeleteRecipe, onDeleteRecipes, onDeleteAllRecipes }) {
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState([])
 
-export default function RecipesTab({ pantry, onAddToShoppingList }) {
+  function toggleSelect(id) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  function exitSelectMode() {
+    setSelecting(false)
+    setSelected([])
+  }
+
+  function handleDeleteSelected() {
+    if (window.confirm(`Delete ${selected.length} of ${recipes.length} recipe${selected.length > 1 ? 's' : ''}?`)) {
+      onDeleteRecipes(selected)
+      exitSelectMode()
+    }
+  }
+
+  function handleClearAll() {
+    if (window.confirm(`Delete all ${recipes.length} recipe${recipes.length > 1 ? 's' : ''}? This cannot be undone.`)) {
+      onDeleteAllRecipes()
+      exitSelectMode()
+    }
+  }
+
   const handleAddMissing = (ingredients) => {
     ingredients.forEach(ing => {
-      onAddToShoppingList({
-        name: ing.name,
-        quantity: ing.quantity,
-        unit: ing.unit,
-        category: 'other',
-      })
+      onAddToShoppingList({ name: ing.name, quantity: ing.quantity, unit: ing.unit, category: 'other' })
     })
   }
 
   return (
     <div className="tab-content">
       <div className="page-header">
-        <h1 className="page-title">Recipes</h1>
-        <p className="page-subtitle">Based on your pantry</p>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <h1 className="page-title">Recipes</h1>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {recipes.length > 0 && (
+              <>
+                <button
+                  onClick={() => {
+                    if (selecting) { exitSelectMode() } else { setSelecting(true) }
+                  }}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, color: selecting ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    fontFamily: 'var(--font-body)', padding: '2px 0', fontWeight: selecting ? 600 : 400,
+                  }}
+                >
+                  {selecting ? 'Done' : 'Select'}
+                </button>
+                {!selecting && (
+                  <button
+                    onClick={handleClearAll}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: 13, color: 'var(--color-text-muted)',
+                      fontFamily: 'var(--font-body)', padding: '2px 0',
+                    }}
+                  >
+                    Clear all
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        <p className="page-subtitle">
+          {recipes.length} recipe{recipes.length !== 1 ? 's' : ''}
+          {selecting && selected.length > 0 && (
+            <span style={{ color: 'var(--color-primary)', marginLeft: 8 }}>· {selected.length} selected</span>
+          )}
+        </p>
       </div>
 
-      <div style={{ padding: '8px 20px 12px', background: 'var(--color-primary-light)', margin: '0 20px', borderRadius: 10, fontSize: 13, color: 'var(--color-primary)' }}>
-        💬 Ask the assistant for personalised recipe suggestions based on what you have.
-      </div>
+      {recipes.length > 0 && (
+        <div style={{ padding: '8px 20px 12px', background: 'var(--color-primary-light)', margin: '0 20px', borderRadius: 10, fontSize: 13, color: 'var(--color-primary)' }}>
+          💬 Ask the assistant for personalised recipe suggestions based on what you have.
+        </div>
+      )}
 
-      <div className="section-label" style={{ marginTop: 20 }}>Suggested for you</div>
+      {recipes.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">👨‍🍳</div>
+          <h3>No recipes yet</h3>
+          <p>Ask the assistant to suggest recipes based on your pantry</p>
+        </div>
+      ) : (
+        <>
+          <div className="section-label" style={{ marginTop: 20 }}>Suggested for you</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {recipes.map(recipe => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                pantry={pantry}
+                onAddMissing={handleAddMissing}
+                onDelete={onDeleteRecipe}
+                selecting={selecting}
+                selected={selected.includes(recipe.id)}
+                onToggleSelect={toggleSelect}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {SAMPLE_RECIPES.map(recipe => (
-          <RecipeCard
-            key={recipe.id}
-            recipe={recipe}
-            pantry={pantry}
-            onAddMissing={handleAddMissing}
-          />
-        ))}
-      </div>
+      {/* Bulk delete action bar */}
+      {selecting && selected.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'calc(var(--tab-height) + var(--safe-bottom) + 12px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'calc(100% - 40px)',
+          maxWidth: 440,
+          zIndex: 50,
+        }}>
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', background: 'var(--color-expiry)' }}
+            onClick={handleDeleteSelected}
+          >
+            Delete {selected.length} of {recipes.length}
+          </button>
+        </div>
+      )}
 
       <div style={{ height: 20 }} />
     </div>
