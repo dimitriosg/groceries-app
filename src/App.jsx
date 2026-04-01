@@ -34,6 +34,11 @@ export default function App() {
   const deletePantryItem = (id) =>
     setPantry(prev => prev.filter(i => i.id !== id))
 
+  const deleteAllPantryItems = () => setPantry([])
+
+  const deletePantryCategory = (category) =>
+    setPantry(prev => prev.filter(i => i.category !== category))
+
   // Shopping list actions
   const addShoppingItem = (item) => {
     const exists = shoppingList.find(i => i.name.toLowerCase() === item.name.toLowerCase())
@@ -74,6 +79,8 @@ export default function App() {
             onAddItem={addPantryItem}
             onUpdateItem={updatePantryItem}
             onDeleteItem={deletePantryItem}
+            onDeleteAll={deleteAllPantryItems}
+            onDeleteCategory={deletePantryCategory}
           />
         )}
         {activeTab === 'shopping' && (

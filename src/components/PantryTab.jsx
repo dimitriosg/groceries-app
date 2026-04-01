@@ -88,7 +88,7 @@ function PantryCard({ item, onClick }) {
   )
 }
 
-export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteItem }) {
+export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteItem, onDeleteAll, onDeleteCategory }) {
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState(null)
@@ -108,11 +108,37 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
   const lowCount = pantry.filter(i => isLowStock(i)).length
   const expiringCount = pantry.filter(i => isExpiringSoon(i) || isExpired(i)).length
 
+  function handleClearAll() {
+    if (window.confirm(`Delete all ${pantry.length} pantry items? This cannot be undone.`)) {
+      onDeleteAll()
+    }
+  }
+
+  function handleDeleteCategory(category) {
+    if (window.confirm(`Delete all items in ${category}?`)) {
+      onDeleteCategory(category)
+    }
+  }
+
   return (
     <>
       <div className="tab-content">
         <div className="page-header">
-          <h1 className="page-title">Pantry</h1>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <h1 className="page-title">Pantry</h1>
+            {pantry.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 13, color: 'var(--color-text-muted)',
+                  padding: '2px 0', fontFamily: 'var(--font-body)',
+                }}
+              >
+                Clear all
+              </button>
+            )}
+          </div>
           <p className="page-subtitle">
             {pantry.length} items
             {lowCount > 0 && <span style={{ color: 'var(--color-low-stock)', marginLeft: 8 }}>· {lowCount} low</span>}
@@ -141,8 +167,19 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
         ) : (
           Object.entries(grouped).map(([category, items]) => (
             <div key={category}>
-              <div className="section-label">
-                {CATEGORY_ICONS[category]} {category}
+              <div className="section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
+                <span>{CATEGORY_ICONS[category]} {category}</span>
+                <button
+                  onClick={() => handleDeleteCategory(category)}
+                  title={`Delete all ${category} items`}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 14, color: 'var(--color-text-muted)',
+                    padding: '0 2px', lineHeight: 1,
+                  }}
+                >
+                  🗑
+                </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px' }}>
                 {items.map(item => (
