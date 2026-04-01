@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { v4 as uuid } from 'uuid'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
 import { INITIAL_PANTRY, INITIAL_SHOPPING_LIST, INITIAL_PREFERENCES, INITIAL_RECIPES } from './constants.js'
 import { applyActions } from './utils/actions.js'
 import { requestPermission, checkPantryAlerts, sendNotification } from './utils/notifications.js'
-import { ensureUser, pushToSupabase, pullFromSupabase } from './utils/sync.js'
+import { pushToSupabase, pullFromSupabase } from './utils/sync.js'
 import PantryTab from './components/PantryTab.jsx'
 import ShoppingTab from './components/ShoppingTab.jsx'
 import RecipesTab from './components/RecipesTab.jsx'
@@ -19,39 +19,28 @@ const TABS = [
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]
 
-// sync status: 'idle' | 'syncing' | 'synced'
+// status: 'idle' | 'syncing' | 'synced' | 'error'
 function SyncDot({ status }) {
-  if (status === 'idle') return null
+  const colors = {
+    idle: '#D1D5DB',
+    syncing: '#22c55e',
+    synced: '#22c55e',
+    error: '#EF4444',
+  }
   return (
     <div style={{
       position: 'fixed',
-      top: 12,
+      top: 14,
       right: 16,
       zIndex: 200,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 5,
-      background: 'var(--color-surface)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-pill)',
-      padding: '3px 9px 3px 6px',
-      boxShadow: 'var(--shadow-sm)',
-      fontSize: 11,
-      color: 'var(--color-text-muted)',
+      width: 10,
+      height: 10,
+      borderRadius: '50%',
+      background: colors[status] ?? colors.idle,
       pointerEvents: 'none',
-    }}>
-      {status === 'syncing' ? (
-        <>
-          <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
-          Syncing
-        </>
-      ) : (
-        <>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
-          Synced
-        </>
-      )}
-    </div>
+      animation: status === 'syncing' ? 'sync-pulse 1s ease-in-out infinite' : 'none',
+      transition: 'background 0.3s',
+    }} />
   )
 }
 
@@ -61,7 +50,6 @@ export default function App() {
   const [shoppingList, setShoppingList] = useLocalStorage('shopping_v1', INITIAL_SHOPPING_LIST)
   const [recipes, setRecipes] = useLocalStorage('recipes_v1', INITIAL_RECIPES)
   const [preferences, setPreferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
-  const [userId, setUserId] = useLocalStorage('user_id_v1', null)
   const [syncStatus, setSyncStatus] = useState('idle')
 
   const debounceRef = useRef(null)
@@ -88,39 +76,39 @@ export default function App() {
     return () => clearInterval(interval)
   }, [pantry, preferences.notificationsEnabled])
 
-  // ── Supabase: sign in + initial pull ───────────────────────────
+  // ── Supabase: initial pull on mount ───────────────────────────
   useEffect(() => {
     async function init() {
-      const uid = await ensureUser()
-      if (!uid) return
-      setUserId(uid)
-
-      setSyncStatus('syncing')
-      const remote = await pullFromSupabase(uid)
-      setSyncStatus('synced')
-      setTimeout(() => setSyncStatus('idle'), 2000)
-
-      if (remote) {
+      try {
+        setSyncStatus('syncing')
+        const remote = await pullFromSupabase()
         if (remote.pantry) setPantry(remote.pantry)
         if (remote.shoppingList) setShoppingList(remote.shoppingList)
+        setSyncStatus('synced')
+        setTimeout(() => setSyncStatus('idle'), 2000)
+      } catch {
+        setSyncStatus('error')
+        setTimeout(() => setSyncStatus('idle'), 3000)
       }
     }
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Supabase: debounced push on data change ────────────────────
-  const schedulePush = useCallback(() => {
-    if (!userId) return
+  useEffect(() => {
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
-      setSyncStatus('syncing')
-      await pushToSupabase(userId, pantryRef.current, shoppingRef.current)
-      setSyncStatus('synced')
-      setTimeout(() => setSyncStatus('idle'), 2000)
+      try {
+        setSyncStatus('syncing')
+        await pushToSupabase(pantryRef.current, shoppingRef.current)
+        setSyncStatus('synced')
+        setTimeout(() => setSyncStatus('idle'), 2000)
+      } catch {
+        setSyncStatus('error')
+        setTimeout(() => setSyncStatus('idle'), 3000)
+      }
     }, 2000)
-  }, [userId])
-
-  useEffect(() => { schedulePush() }, [pantry, shoppingList, schedulePush])
+  }, [pantry, shoppingList])
 
   // ── Pantry actions ─────────────────────────────────────────────
   const addPantryItem = (item) => setPantry(prev => [...prev, item])
@@ -177,6 +165,13 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
       <SyncDot status={syncStatus} />
+
+      <style>{`
+        @keyframes sync-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.7); }
+        }
+      `}</style>
 
       {/* Main content */}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
