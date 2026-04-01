@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { v4 as uuid } from 'uuid'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
-import { INITIAL_PANTRY, INITIAL_SHOPPING_LIST, INITIAL_PREFERENCES } from './constants.js'
+import { INITIAL_PANTRY, INITIAL_SHOPPING_LIST, INITIAL_PREFERENCES, INITIAL_RECIPES } from './constants.js'
 import { applyActions } from './utils/actions.js'
 import PantryTab from './components/PantryTab.jsx'
 import ShoppingTab from './components/ShoppingTab.jsx'
@@ -21,6 +21,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('pantry')
   const [pantry, setPantry] = useLocalStorage('pantry_v1', INITIAL_PANTRY)
   const [shoppingList, setShoppingList] = useLocalStorage('shopping_v1', INITIAL_SHOPPING_LIST)
+  const [recipes, setRecipes] = useLocalStorage('recipes_v1', INITIAL_RECIPES)
   const [preferences, setPreferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
 
   const appState = { pantry, shoppingList, preferences }
@@ -55,12 +56,18 @@ export default function App() {
 
   const deleteAllShoppingItems = () => setShoppingList([])
 
+  // Recipe actions
+  const deleteRecipe = (id) => setRecipes(prev => prev.filter(r => r.id !== id))
+  const deleteRecipes = (ids) => setRecipes(prev => prev.filter(r => !ids.includes(r.id)))
+  const deleteAllRecipes = () => setRecipes([])
+
   // Settings actions
   const updatePreferences = (updated) => setPreferences(updated)
 
   const resetData = () => {
     setPantry(INITIAL_PANTRY)
     setShoppingList(INITIAL_SHOPPING_LIST)
+    setRecipes(INITIAL_RECIPES)
   }
 
   // AI state change (from assistant)
@@ -100,7 +107,11 @@ export default function App() {
         {activeTab === 'recipes' && (
           <RecipesTab
             pantry={pantry}
+            recipes={recipes}
             onAddToShoppingList={addShoppingItem}
+            onDeleteRecipe={deleteRecipe}
+            onDeleteRecipes={deleteRecipes}
+            onDeleteAllRecipes={deleteAllRecipes}
           />
         )}
         {activeTab === 'assistant' && (

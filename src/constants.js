@@ -129,6 +129,57 @@ export const INITIAL_SHOPPING_LIST = [
   },
 ]
 
+export const INITIAL_RECIPES = [
+  {
+    id: 'r1',
+    title: 'Spaghetti alla Carbonara',
+    cuisine: 'Italian',
+    skillLevel: 'intermediate',
+    servings: 2,
+    estimatedTimeMinutes: 25,
+    ingredients: [
+      { name: 'Pasta (Spaghetti)', quantity: 200, unit: 'g' },
+      { name: 'Pancetta', quantity: 100, unit: 'g' },
+      { name: 'Eggs', quantity: 3, unit: 'units' },
+      { name: 'Parmesan', quantity: 50, unit: 'g' },
+      { name: 'Black Pepper', quantity: 1, unit: 'tsp' },
+      { name: 'Sea Salt', quantity: 1, unit: 'tsp' },
+    ],
+    steps: [
+      'Bring a large pot of salted water to a boil. Cook spaghetti until al dente.',
+      'In a bowl, whisk together eggs, grated parmesan, and plenty of black pepper.',
+      'Fry pancetta in a pan until crispy. Reserve the fat.',
+      'Drain pasta, reserving a cup of pasta water.',
+      'Off the heat, toss pasta with pancetta and fat, then quickly add egg mixture.',
+      'Add pasta water gradually to create a creamy sauce. Season and serve immediately.',
+    ],
+    source: 'ai-generated',
+  },
+  {
+    id: 'r2',
+    title: 'Cherry Tomato Bruschetta',
+    cuisine: 'Italian',
+    skillLevel: 'beginner',
+    servings: 2,
+    estimatedTimeMinutes: 15,
+    ingredients: [
+      { name: 'Cherry Tomatoes', quantity: 200, unit: 'g' },
+      { name: 'Garlic', quantity: 2, unit: 'units' },
+      { name: 'Olive Oil', quantity: 3, unit: 'tbsp' },
+      { name: 'Sea Salt', quantity: 0.5, unit: 'tsp' },
+      { name: 'Sourdough Bread', quantity: 4, unit: 'slices' },
+    ],
+    steps: [
+      'Halve the cherry tomatoes and mince the garlic.',
+      'Toss tomatoes with olive oil, garlic, salt, and pepper. Let sit 10 minutes.',
+      'Toast or grill the bread slices until golden.',
+      'Rub toast with a cut garlic clove, then spoon the tomato mixture over.',
+      'Drizzle with extra olive oil and serve immediately.',
+    ],
+    source: 'ai-generated',
+  },
+]
+
 export const INITIAL_PREFERENCES = {
   cuisines: ['Italian', 'Mediterranean', 'Asian'],
   skillLevel: 'intermediate',
