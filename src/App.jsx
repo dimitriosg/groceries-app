@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { v4 as uuid } from 'uuid'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
 import { INITIAL_PANTRY, INITIAL_SHOPPING_LIST, INITIAL_PREFERENCES, INITIAL_RECIPES } from './constants.js'
 import { applyActions } from './utils/actions.js'
+import { requestPermission, checkPantryAlerts, sendNotification } from './utils/notifications.js'
 import PantryTab from './components/PantryTab.jsx'
 import ShoppingTab from './components/ShoppingTab.jsx'
 import RecipesTab from './components/RecipesTab.jsx'
@@ -25,6 +26,26 @@ export default function App() {
   const [preferences, setPreferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
 
   const appState = { pantry, shoppingList, preferences }
+
+  // Notifications
+  useEffect(() => {
+    requestPermission()
+  }, [])
+
+  useEffect(() => {
+    if (!preferences.notificationsEnabled) return
+
+    function runAlerts() {
+      const alerts = checkPantryAlerts(pantry)
+      if (alerts.length > 0) {
+        sendNotification('Pantry alert', alerts.join(' · '))
+      }
+    }
+
+    runAlerts()
+    const interval = setInterval(runAlerts, 60 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [pantry, preferences.notificationsEnabled])
 
   // Pantry actions
   const addPantryItem = (item) => setPantry(prev => [...prev, item])

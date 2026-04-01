@@ -114,10 +114,17 @@ export default function SettingsTab({ preferences, onUpdate, onResetData }) {
           />
         </Row>
 
-        <Row label="Voice input" last>
+        <Row label="Voice input">
           <Toggle
             checked={preferences.voiceEnabled ?? false}
             onChange={val => update('voiceEnabled', val)}
+          />
+        </Row>
+
+        <Row label="Pantry alerts" last>
+          <Toggle
+            checked={preferences.notificationsEnabled ?? true}
+            onChange={val => update('notificationsEnabled', val)}
           />
         </Row>
       </Section>

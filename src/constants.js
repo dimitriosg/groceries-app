@@ -186,4 +186,5 @@ export const INITIAL_PREFERENCES = {
   householdSize: 2,
   lowStockThreshold: 2,
   voiceEnabled: false,
+  notificationsEnabled: true,
 }
