@@ -53,6 +53,8 @@ export default function App() {
   const deleteShoppingItem = (id) =>
     setShoppingList(prev => prev.filter(i => i.id !== id))
 
+  const deleteAllShoppingItems = () => setShoppingList([])
+
   // Settings actions
   const updatePreferences = (updated) => setPreferences(updated)
 
@@ -88,6 +90,7 @@ export default function App() {
             shoppingList={shoppingList}
             onToggle={toggleShoppingItem}
             onDelete={deleteShoppingItem}
+            onDeleteAll={deleteAllShoppingItems}
             onAdd={addShoppingItem}
             pantry={pantry}
             addPantryItem={addPantryItem}

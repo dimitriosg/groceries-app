@@ -199,7 +199,7 @@ function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, on
   )
 }
 
-export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, pantry, addPantryItem, updatePantryItem }) {
+export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, onDeleteAll, pantry, addPantryItem, updatePantryItem }) {
   const [showAdd, setShowAdd] = useState(false)
   const [pendingPantry, setPendingPantry] = useState(null)
   // pendingPantry: { id, step: 'ask' | 'category', category } | null
@@ -286,7 +286,25 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, p
     <>
       <div className="tab-content">
         <div className="page-header">
-          <h1 className="page-title">Shopping List</h1>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <h1 className="page-title">Shopping List</h1>
+            {shoppingList.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Delete all ${shoppingList.length} shopping items? This cannot be undone.`)) {
+                    onDeleteAll()
+                  }
+                }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 13, color: 'var(--color-text-muted)',
+                  padding: '2px 0', fontFamily: 'var(--font-body)',
+                }}
+              >
+                Clear all
+              </button>
+            )}
+          </div>
           <p className="page-subtitle">
             {unchecked.length} to get{checked.length > 0 ? ` · ${checked.length} done` : ''}
           </p>
