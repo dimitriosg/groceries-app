@@ -22,14 +22,25 @@ const INITIAL_GREETING = {
   content: "Hi! I'm your kitchen assistant. I know what's in your pantry and can help you cook, shop, and plan meals. What would you like to do?",
 }
 
-// status: 'idle' | 'syncing' | 'synced' | 'error'
-function SyncIndicator({ status, shared }) {
+// syncStatus: 'idle' | 'syncing' | 'synced' | 'error'
+// realtimeStatus: 'SUBSCRIBING' | 'SUBSCRIBED' | 'CLOSED' | 'CHANNEL_ERROR' | null
+function SyncIndicator({ status, shared, realtimeStatus }) {
   const colors = {
     idle: '#D1D5DB',
     syncing: '#3B82F6',
     synced: '#22c55e',
     error: '#EF4444',
   }
+
+  const rtLabel = realtimeStatus === 'SUBSCRIBING' ? 'Connecting…'
+    : realtimeStatus === 'SUBSCRIBED' ? 'Live'
+    : realtimeStatus === 'CLOSED' || realtimeStatus === 'CHANNEL_ERROR' ? 'Offline'
+    : null
+
+  const rtColor = realtimeStatus === 'SUBSCRIBED' ? '#22c55e'
+    : realtimeStatus === 'SUBSCRIBING' ? '#F59E0B'
+    : '#9CA3AF'
+
   return (
     <div style={{
       position: 'fixed',
@@ -38,9 +49,19 @@ function SyncIndicator({ status, shared }) {
       zIndex: 200,
       display: 'flex',
       alignItems: 'center',
-      gap: 4,
+      gap: 5,
       pointerEvents: 'none',
     }}>
+      {shared && rtLabel && (
+        <span style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: rtColor,
+          letterSpacing: 0.2,
+        }}>
+          {rtLabel}
+        </span>
+      )}
       {shared && (
         <span style={{ fontSize: 12, lineHeight: 1 }}>👥</span>
       )}
@@ -64,6 +85,7 @@ export default function App() {
   const [recipes, setRecipes] = useLocalStorage('recipes_v1', INITIAL_RECIPES)
   const [preferences, setPreferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
   const [syncStatus, setSyncStatus] = useState('idle')
+  const [realtimeStatus, setRealtimeStatus] = useState(null)
   const [householdId, setHouseholdId] = useState(() => getOrCreateHouseholdId())
 
   // ── Conversation state (lifted so it survives tab switches) ────
@@ -121,7 +143,8 @@ export default function App() {
           if (hasRemotePantry) { isRemoteUpdateRef.current = true; setPantry(remote.pantry) }
           if (hasRemoteShopping) { isRemoteUpdateRef.current = true; setShoppingList(remote.shoppingList) }
         } else {
-          await pushToSupabase(pantryRef.current, shoppingRef.current)
+          // Remote is empty — seed it from localStorage so the second device gets our data
+          await pushToSupabase(householdId, pantryRef.current, shoppingRef.current)
         }
 
         setSyncStatus('synced')
@@ -136,27 +159,34 @@ export default function App() {
       if (channelRef.current) supabase.removeChannel(channelRef.current)
 
       channelRef.current = supabase
-        .channel('household-sync')
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'pantry', filter: `id=eq.${householdId}` },
+        .channel(`household-${householdId}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'pantry' },
           (payload) => {
-            if (payload.new?.data) {
+            if (payload.new?.id !== householdId) return
+            const incoming = payload.new?.data
+            if (incoming && Array.isArray(incoming)) {
               isRemoteUpdateRef.current = true
-              setPantry(payload.new.data)
+              setPantry(incoming)
             }
           }
         )
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'shopping_list', filter: `id=eq.${householdId}` },
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'shopping_list' },
           (payload) => {
-            if (payload.new?.data) {
+            if (payload.new?.id !== householdId) return
+            const incoming = payload.new?.data
+            if (incoming && Array.isArray(incoming)) {
               isRemoteUpdateRef.current = true
-              setShoppingList(payload.new.data)
+              setShoppingList(incoming)
             }
           }
         )
-        .subscribe((status) => {
-          console.log('Realtime status:', status)
+        .subscribe((status, err) => {
+          console.log('[Realtime] status:', status, err ?? '')
+          setRealtimeStatus(status)
         })
     } catch {
       // Fail silently — realtime is an enhancement
@@ -179,7 +209,7 @@ export default function App() {
     debounceRef.current = setTimeout(async () => {
       try {
         setSyncStatus('syncing')
-        await pushToSupabase(pantryRef.current, shoppingRef.current)
+        await pushToSupabase(householdId, pantryRef.current, shoppingRef.current)
         setSyncStatus('synced')
         setTimeout(() => setSyncStatus('idle'), 3000)
       } catch {
@@ -273,7 +303,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
-      <SyncIndicator status={syncStatus} shared={isSharedHousehold} />
+      <SyncIndicator status={syncStatus} shared={isSharedHousehold} realtimeStatus={realtimeStatus} />
       <Toast message={toast} />
 
       <style>{`

@@ -1,19 +1,17 @@
 import { supabase, getOrCreateHouseholdId } from './supabase.js'
 
-export async function pushToSupabase(pantry, shoppingList) {
-  const householdId = getOrCreateHouseholdId()
-  await supabase.from('pantry').upsert({
-    id: householdId,
-    user_id: householdId,
-    data: pantry,
-    updated_at: new Date().toISOString(),
-  })
-  await supabase.from('shopping_list').upsert({
-    id: householdId,
-    user_id: householdId,
-    data: shoppingList,
-    updated_at: new Date().toISOString(),
-  })
+export async function pushToSupabase(householdId, pantry, shoppingList) {
+  const timestamp = new Date().toISOString()
+
+  await supabase.from('pantry').upsert(
+    { id: householdId, user_id: householdId, data: pantry, updated_at: timestamp },
+    { onConflict: 'id' }
+  )
+
+  await supabase.from('shopping_list').upsert(
+    { id: householdId, user_id: householdId, data: shoppingList, updated_at: timestamp },
+    { onConflict: 'id' }
+  )
 }
 
 export async function pullFromSupabase(householdId) {
