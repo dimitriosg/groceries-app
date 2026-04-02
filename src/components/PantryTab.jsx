@@ -92,7 +92,7 @@ function PantryCard({ item, onClick }) {
 }
 
 export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteItem, onDeleteAll, onDeleteCategory }) {
-  const { t } = useTranslation()
+  const { t, tCat } = useTranslation()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState(null)
@@ -207,7 +207,7 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
           Object.entries(grouped).map(([category, items]) => (
             <div key={category}>
               <div className="section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20 }}>
-                <span>{CATEGORY_ICONS[category]} {category}</span>
+                <span>{CATEGORY_ICONS[category]} {tCat(category)}</span>
                 <button
                   onClick={() => handleDeleteCategory(category)}
                   title={`Delete all ${category} items`}
@@ -240,6 +240,7 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
         <AddItemModal
           onClose={() => setShowAdd(false)}
           onAdd={onAddItem}
+          pantry={pantry}
         />
       )}
 

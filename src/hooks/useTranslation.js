@@ -6,5 +6,7 @@ export function useTranslation() {
   const { lang } = useContext(LangContext)
   const dict = translations[lang] || translations.en
   const t = (key) => dict[key] ?? translations.en[key] ?? key
-  return { t, lang }
+  const tUnit = (unitKey) => dict.units?.[unitKey] ?? unitKey
+  const tCat = (catKey) => dict.categories?.[catKey] ?? catKey
+  return { t, lang, tUnit, tCat }
 }

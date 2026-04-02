@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/browser'
-import { CATEGORIES } from '../constants.js'
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library'
+import { CATEGORIES, PANTRY_UNITS } from '../constants.js'
+import { useTranslation } from '../hooks/useTranslation.js'
+
+// Optimised hints: only scan barcode formats relevant for food products
+const SCAN_HINTS = new Map()
+SCAN_HINTS.set(DecodeHintType.POSSIBLE_FORMATS, [
+  BarcodeFormat.EAN_13,   // Most common for EU/Greek products
+  BarcodeFormat.EAN_8,    // Smaller EU barcodes
+  BarcodeFormat.UPC_A,    // US products
+  BarcodeFormat.UPC_E,    // Compact US
+  BarcodeFormat.CODE_128, // General purpose
+])
+SCAN_HINTS.set(DecodeHintType.TRY_HARDER, true)
 
 // Map Open Food Facts categories to our app categories
 function mapCategory(offCategories = '') {
@@ -28,31 +40,70 @@ function parseQuantity(str = '') {
   return { quantity: qty, unit: unitMap[rawUnit] || rawUnit }
 }
 
-async function lookupBarcode(barcode) {
-  const res = await fetch(
-    `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`
-  )
-  if (!res.ok) throw new Error('Network error')
-  const data = await res.json()
-  if (data.status !== 1) return null
-
-  const p = data.product
+function parseOFFProduct(p, barcode) {
   const { quantity, unit } = parseQuantity(p.quantity)
-
   return {
-    name: p.product_name || p.abbreviated_product_name || '',
+    name: p.product_name_el   // Greek name first
+      || p.product_name
+      || p.abbreviated_product_name
+      || '',
     brand: p.brands ? p.brands.split(',')[0].trim() : undefined,
     category: mapCategory(p.categories || p.food_groups || ''),
     quantity,
     unit,
     barcode,
+    source: 'openfoodfacts',
   }
 }
 
-export default function BarcodeScanner({ onResult, onClose }) {
+async function lookupBarcode(barcode, pantry) {
+  // 1. Check local pantry first (instant, no network)
+  const localMatch = (pantry || []).find(item => item.barcode === barcode)
+  if (localMatch) {
+    return {
+      name: localMatch.name,
+      brand: localMatch.brand,
+      category: localMatch.category,
+      quantity: localMatch.quantity,
+      unit: localMatch.unit,
+      barcode,
+      source: 'local',
+    }
+  }
+
+  // 2. Try Greek Open Food Facts first
+  try {
+    const grRes = await fetch(
+      `https://gr.openfoodfacts.org/api/v0/product/${barcode}.json`,
+      { signal: AbortSignal.timeout(3000) }
+    )
+    const grData = await grRes.json()
+    if (grData.status === 1 && grData.product?.product_name) {
+      return parseOFFProduct(grData.product, barcode)
+    }
+  } catch {}
+
+  // 3. Fall back to global Open Food Facts
+  try {
+    const worldRes = await fetch(
+      `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
+      { signal: AbortSignal.timeout(4000) }
+    )
+    const worldData = await worldRes.json()
+    if (worldData.status === 1 && worldData.product?.product_name) {
+      return parseOFFProduct(worldData.product, barcode)
+    }
+  } catch {}
+
+  // 4. Not found anywhere
+  return { name: '', brand: '', category: 'other', quantity: 1, unit: 'units', barcode, source: 'not_found' }
+}
+
+export default function BarcodeScanner({ onResult, onClose, pantry }) {
+  const { t } = useTranslation()
   const videoRef = useRef(null)
   const readerRef = useRef(null)
-  const [status, setStatus] = useState('scanning') // scanning | found | error | loading
+  const [status, setStatus] = useState('scanning') // scanning | detected | loading | found | error
   const [errorMsg, setErrorMsg] = useState('')
   const [scannedProduct, setScannedProduct] = useState(null)
   const [torchOn, setTorchOn] = useState(false)
@@ -60,7 +111,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
   const hasScanned = useRef(false)
 
   useEffect(() => {
-    const reader = new BrowserMultiFormatReader()
+    const reader = new BrowserMultiFormatReader(SCAN_HINTS)
     readerRef.current = reader
 
     let controls
@@ -77,7 +128,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
       async (result, err, ctrl) => {
         if (!controls && ctrl) {
           controls = ctrl
-          // Save track for torch
           const stream = videoRef.current?.srcObject
           if (stream) {
             trackRef.current = stream.getVideoTracks()[0]
@@ -86,18 +136,13 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
         if (result && !hasScanned.current) {
           hasScanned.current = true
-          setStatus('loading')
+          setStatus('detected') // immediate visual feedback
           const barcode = result.getText()
+          setStatus('loading')
           try {
-            const product = await lookupBarcode(barcode)
-            if (product && product.name) {
-              setScannedProduct(product)
-              setStatus('found')
-            } else {
-              // Barcode not in database — let user enter manually
-              setScannedProduct({ barcode, name: '', brand: '', category: 'other', quantity: 1, unit: 'units' })
-              setStatus('found')
-            }
+            const product = await lookupBarcode(barcode, pantry)
+            setScannedProduct(product)
+            setStatus('found')
           } catch {
             hasScanned.current = false
             setStatus('scanning')
@@ -117,13 +162,13 @@ export default function BarcodeScanner({ onResult, onClose }) {
       controls?.stop()
       readerRef.current = null
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleTorch = async () => {
     if (!trackRef.current) return
     try {
       await trackRef.current.applyConstraints({ advanced: [{ torch: !torchOn }] })
-      setTorchOn(t => !t)
+      setTorchOn(v => !v)
     } catch {
       // torch not supported on this device
     }
@@ -134,6 +179,8 @@ export default function BarcodeScanner({ onResult, onClose }) {
     setScannedProduct(null)
     setStatus('scanning')
   }
+
+  const frameColor = status === 'detected' || status === 'loading' ? '#22c55e' : 'white'
 
   return (
     <div style={{
@@ -152,34 +199,28 @@ export default function BarcodeScanner({ onResult, onClose }) {
           playsInline
         />
 
-        {/* Overlay with scan frame */}
-        {status === 'scanning' && (
+        {/* Scan frame overlay */}
+        {(status === 'scanning' || status === 'detected') && (
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'none',
           }}>
-            {/* Dark overlay with cutout */}
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
-
-            {/* Scan frame */}
             <div style={{
               position: 'relative',
               width: 260, height: 160,
               zIndex: 1,
             }}>
-              {/* Corner markers */}
               {[
-                { top: 0, left: 0, borderTop: '3px solid white', borderLeft: '3px solid white' },
-                { top: 0, right: 0, borderTop: '3px solid white', borderRight: '3px solid white' },
-                { bottom: 0, left: 0, borderBottom: '3px solid white', borderLeft: '3px solid white' },
-                { bottom: 0, right: 0, borderBottom: '3px solid white', borderRight: '3px solid white' },
+                { top: 0, left: 0, borderTop: `3px solid ${frameColor}`, borderLeft: `3px solid ${frameColor}` },
+                { top: 0, right: 0, borderTop: `3px solid ${frameColor}`, borderRight: `3px solid ${frameColor}` },
+                { bottom: 0, left: 0, borderBottom: `3px solid ${frameColor}`, borderLeft: `3px solid ${frameColor}` },
+                { bottom: 0, right: 0, borderBottom: `3px solid ${frameColor}`, borderRight: `3px solid ${frameColor}` },
               ].map((style, i) => (
                 <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...style }} />
               ))}
-
-              {/* Scan line animation */}
               <div style={{
                 position: 'absolute',
                 left: 4, right: 4,
@@ -189,9 +230,8 @@ export default function BarcodeScanner({ onResult, onClose }) {
                 animation: 'scanLine 2s ease-in-out infinite',
               }} />
             </div>
-
-            <p style={{ color: 'white', fontSize: 14, marginTop: 20, zIndex: 1, opacity: 0.9 }}>
-              Point camera at a barcode
+            <p style={{ color: status === 'detected' ? '#22c55e' : 'white', fontSize: 14, marginTop: 20, zIndex: 1, opacity: 0.9, fontWeight: status === 'detected' ? 600 : 400 }}>
+              {status === 'detected' ? t('barcodeDetected') : 'Point camera at a barcode'}
             </p>
           </div>
         )}
@@ -206,12 +246,12 @@ export default function BarcodeScanner({ onResult, onClose }) {
             <div style={{
               width: 48, height: 48,
               border: '3px solid rgba(255,255,255,0.2)',
-              borderTop: '3px solid white',
+              borderTop: '3px solid #22c55e',
               borderRadius: '50%',
               animation: 'spin 0.7s linear infinite',
               marginBottom: 12,
             }} />
-            <p style={{ color: 'white', fontSize: 14 }}>Looking up product...</p>
+            <p style={{ color: 'white', fontSize: 14 }}>{t('barcodeDetected')}</p>
           </div>
         )}
 
@@ -224,12 +264,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
           }}>
             <span style={{ fontSize: 48 }}>📷</span>
             <p style={{ color: 'white', textAlign: 'center', fontSize: 15, lineHeight: 1.5 }}>{errorMsg}</p>
-            <button
-              className="btn btn-primary"
-              onClick={onClose}
-            >
-              Go back
-            </button>
+            <button className="btn btn-primary" onClick={onClose}>Go back</button>
           </div>
         )}
 
@@ -292,6 +327,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
 }
 
 function ProductResultSheet({ product, onConfirm, onRescan, onClose }) {
+  const { t, tCat } = useTranslation()
   const [form, setForm] = useState({
     name: product.name || '',
     brand: product.brand || '',
@@ -347,7 +383,7 @@ function ProductResultSheet({ product, onConfirm, onRescan, onClose }) {
       </div>
 
       <div className="form-group">
-        <label className="form-label">Item name *</label>
+        <label className="form-label">{t('itemNameLabel')} *</label>
         <input
           className="form-input"
           placeholder="e.g. Oat Milk"
@@ -358,37 +394,39 @@ function ProductResultSheet({ product, onConfirm, onRescan, onClose }) {
       </div>
 
       <div className="form-group">
-        <label className="form-label">Brand</label>
+        <label className="form-label">{t('brandLabel')}</label>
         <input className="form-input" value={form.brand} onChange={e => set('brand', e.target.value)} placeholder="Optional" />
       </div>
 
       <div className="form-group">
-        <label className="form-label">Category</label>
+        <label className="form-label">{t('categoryLabel')}</label>
         <select className="form-select" value={form.category} onChange={e => set('category', e.target.value)}>
           {CATEGORIES.map(cat => (
-            <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+            <option key={cat} value={cat}>{tCat(cat)}</option>
           ))}
         </select>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="form-group">
-          <label className="form-label">Quantity</label>
+          <label className="form-label">{t('quantityLabel')}</label>
           <input className="form-input" type="number" min="0" step="any" value={form.quantity} onChange={e => set('quantity', e.target.value)} />
         </div>
         <div className="form-group">
-          <label className="form-label">Unit</label>
-          <input className="form-input" value={form.unit} onChange={e => set('unit', e.target.value)} />
+          <label className="form-label">{t('unitLabel')}</label>
+          <select className="form-select" value={form.unit} onChange={e => set('unit', e.target.value)}>
+            {PANTRY_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="form-group">
-          <label className="form-label">Low stock alert</label>
+          <label className="form-label">{t('lowStockAlert')}</label>
           <input className="form-input" type="number" min="0" step="any" value={form.lowStockThreshold} onChange={e => set('lowStockThreshold', e.target.value)} />
         </div>
         <div className="form-group">
-          <label className="form-label">Expiry date</label>
+          <label className="form-label">{t('expiryDateLabel')}</label>
           <input className="form-input" type="date" value={form.expiryDate} onChange={e => set('expiryDate', e.target.value)} />
         </div>
       </div>
@@ -403,7 +441,7 @@ function ProductResultSheet({ product, onConfirm, onRescan, onClose }) {
           onClick={handleConfirm}
           disabled={!form.name.trim()}
         >
-          Add to Pantry
+          {t('addToPantryBtn')}
         </button>
       </div>
     </div>

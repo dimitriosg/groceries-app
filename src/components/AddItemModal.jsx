@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { v4 as uuid } from 'uuid'
-import { CATEGORIES, CATEGORY_ICONS } from '../constants.js'
+import { CATEGORIES, CATEGORY_ICONS, PANTRY_UNITS } from '../constants.js'
 import BarcodeScanner from './BarcodeScanner.jsx'
 import { useTranslation } from '../hooks/useTranslation.js'
 
-const UNITS = ['units', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'loaf', 'bunch', 'pack']
-
-export default function AddItemModal({ onClose, onAdd }) {
-  const { t } = useTranslation()
+export default function AddItemModal({ onClose, onAdd, pantry }) {
+  const { t, tCat, tUnit } = useTranslation()
   const [scanning, setScanning] = useState(false)
   const [form, setForm] = useState({
     name: '',
@@ -37,6 +35,7 @@ export default function AddItemModal({ onClose, onAdd }) {
       <BarcodeScanner
         onResult={handleScanResult}
         onClose={() => setScanning(false)}
+        pantry={pantry}
       />
     )
   }
@@ -120,7 +119,7 @@ export default function AddItemModal({ onClose, onAdd }) {
             >
               {CATEGORIES.map(cat => (
                 <option key={cat} value={cat}>
-                  {CATEGORY_ICONS[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  {CATEGORY_ICONS[cat]} {tCat(cat)}
                 </option>
               ))}
             </select>
@@ -146,7 +145,7 @@ export default function AddItemModal({ onClose, onAdd }) {
                 value={form.unit}
                 onChange={e => set('unit', e.target.value)}
               >
-                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                {PANTRY_UNITS.map(u => <option key={u} value={u}>{tUnit(u)}</option>)}
               </select>
             </div>
           </div>
