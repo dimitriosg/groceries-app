@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { v4 as uuid } from 'uuid'
 import { CATEGORIES, CATEGORY_ICONS } from '../constants.js'
 import BarcodeScanner from './BarcodeScanner.jsx'
+import { useTranslation } from '../hooks/useTranslation.js'
 
 const UNITS = ['units', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'loaf', 'bunch', 'pack']
 
 export default function AddItemModal({ onClose, onAdd }) {
+  const { t } = useTranslation()
   const [scanning, setScanning] = useState(false)
   const [form, setForm] = useState({
     name: '',
@@ -17,7 +19,6 @@ export default function AddItemModal({ onClose, onAdd }) {
     expiryDate: '',
   })
 
-  // When barcode scanner returns a product, pre-fill form
   const handleScanResult = (product) => {
     setScanning(false)
     setForm({
@@ -67,12 +68,11 @@ export default function AddItemModal({ onClose, onAdd }) {
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet">
-        {/* Handle */}
         <div style={{ width: 40, height: 4, background: 'var(--color-border)', borderRadius: 2, margin: '0 auto 20px' }} />
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600 }}>
-            Add Pantry Item
+            {t('addPantryItem')}
           </h2>
           <button
             type="button"
@@ -85,13 +85,13 @@ export default function AddItemModal({ onClose, onAdd }) {
               fontFamily: 'var(--font-body)',
             }}
           >
-            📷 Scan
+            📷 {t('scanBarcode')}
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Item name *</label>
+            <label className="form-label">{t('itemNameLabel')} *</label>
             <input
               className="form-input"
               placeholder="e.g. Olive Oil"
@@ -102,7 +102,7 @@ export default function AddItemModal({ onClose, onAdd }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Brand (optional)</label>
+            <label className="form-label">{t('brandLabel')} {t('brandOptional')}</label>
             <input
               className="form-input"
               placeholder="e.g. Filippo Berio"
@@ -112,7 +112,7 @@ export default function AddItemModal({ onClose, onAdd }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Category</label>
+            <label className="form-label">{t('categoryLabel')}</label>
             <select
               className="form-select"
               value={form.category}
@@ -128,7 +128,7 @@ export default function AddItemModal({ onClose, onAdd }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Quantity</label>
+              <label className="form-label">{t('quantityLabel')}</label>
               <input
                 className="form-input"
                 type="number"
@@ -140,7 +140,7 @@ export default function AddItemModal({ onClose, onAdd }) {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Unit</label>
+              <label className="form-label">{t('unitLabel')}</label>
               <select
                 className="form-select"
                 value={form.unit}
@@ -153,7 +153,7 @@ export default function AddItemModal({ onClose, onAdd }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Low stock alert</label>
+              <label className="form-label">{t('lowStockAlert')}</label>
               <input
                 className="form-input"
                 type="number"
@@ -165,7 +165,7 @@ export default function AddItemModal({ onClose, onAdd }) {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Expiry date</label>
+              <label className="form-label">{t('expiryDateLabel')}</label>
               <input
                 className="form-input"
                 type="date"
@@ -177,10 +177,10 @@ export default function AddItemModal({ onClose, onAdd }) {
 
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
             <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>
-              Cancel
+              {t('cancel')}
             </button>
             <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-              Add to Pantry
+              {t('addToPantryBtn')}
             </button>
           </div>
         </form>

@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { v4 as uuid } from 'uuid'
 import { CATEGORIES, CATEGORY_ICONS } from '../constants.js'
+import AppModal from './AppModal.jsx'
+import { useTranslation } from '../hooks/useTranslation.js'
 
 function AddShoppingModal({ onClose, onAdd }) {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unit, setUnit] = useState('units')
@@ -29,25 +32,25 @@ function AddShoppingModal({ onClose, onAdd }) {
       <div className="modal-sheet">
         <div style={{ width: 40, height: 4, background: 'var(--color-border)', borderRadius: 2, margin: '0 auto 20px' }} />
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, marginBottom: 20 }}>
-          Add to Shopping List
+          {t('addToShoppingList')}
         </h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Item name *</label>
+            <label className="form-label">{t('itemNameLabel')} *</label>
             <input className="form-input" placeholder="e.g. Oat Milk" value={name} onChange={e => setName(e.target.value)} autoFocus />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Quantity</label>
+              <label className="form-label">{t('quantityLabel')}</label>
               <input className="form-input" type="number" min="0" step="any" placeholder="1" value={quantity} onChange={e => setQuantity(e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label">Unit</label>
+              <label className="form-label">{t('unitLabel')}</label>
               <input className="form-input" placeholder="units" value={unit} onChange={e => setUnit(e.target.value)} />
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Category</label>
+            <label className="form-label">{t('categoryLabel')}</label>
             <select className="form-select" value={category} onChange={e => setCategory(e.target.value)}>
               {CATEGORIES.map(cat => (
                 <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
@@ -55,8 +58,8 @@ function AddShoppingModal({ onClose, onAdd }) {
             </select>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-            <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Add Item</button>
+            <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>{t('cancel')}</button>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>{t('addToShoppingList')}</button>
           </div>
         </form>
       </div>
@@ -65,6 +68,7 @@ function AddShoppingModal({ onClose, onAdd }) {
 }
 
 function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, onPantrySkip, onCategoryChange, onPantryConfirm }) {
+  const { t } = useTranslation()
   const showPrompt = !!pending
 
   return (
@@ -132,26 +136,16 @@ function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, on
           padding: '10px 16px',
           background: 'var(--color-primary-light)',
           borderTop: '1px solid var(--color-border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
+          display: 'flex', alignItems: 'center', gap: 10,
         }}>
           <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--color-primary)' }}>
-            Add to pantry?
+            {t('addToPantryQuestion')}
           </span>
-          <button
-            className="btn btn-primary"
-            style={{ padding: '4px 14px', fontSize: 13 }}
-            onClick={() => onPantryYes(item)}
-          >
-            Yes
+          <button className="btn btn-primary" style={{ padding: '4px 14px', fontSize: 13 }} onClick={() => onPantryYes(item)}>
+            {t('yes')}
           </button>
-          <button
-            className="btn btn-ghost"
-            style={{ padding: '4px 14px', fontSize: 13 }}
-            onClick={() => onPantrySkip()}
-          >
-            Skip
+          <button className="btn btn-ghost" style={{ padding: '4px 14px', fontSize: 13 }} onClick={() => onPantrySkip()}>
+            {t('skip')}
           </button>
         </div>
       )}
@@ -163,7 +157,7 @@ function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, on
           borderTop: '1px solid var(--color-border)',
         }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', marginBottom: 8 }}>
-            Choose category
+            {t('chooseCategory')}
           </div>
           <select
             className="form-select"
@@ -178,19 +172,11 @@ function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, on
             ))}
           </select>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="btn btn-primary"
-              style={{ flex: 1, fontSize: 13 }}
-              onClick={() => onPantryConfirm(item)}
-            >
-              Add to pantry
+            <button className="btn btn-primary" style={{ flex: 1, fontSize: 13 }} onClick={() => onPantryConfirm(item)}>
+              {t('addToPantry')}
             </button>
-            <button
-              className="btn btn-ghost"
-              style={{ flex: 1, fontSize: 13 }}
-              onClick={() => onPantrySkip()}
-            >
-              Cancel
+            <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13 }} onClick={() => onPantrySkip()}>
+              {t('cancel')}
             </button>
           </div>
         </div>
@@ -200,18 +186,17 @@ function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, on
 }
 
 export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, onDeleteAll, pantry, addPantryItem, updatePantryItem }) {
+  const { t } = useTranslation()
   const [showAdd, setShowAdd] = useState(false)
   const [pendingPantry, setPendingPantry] = useState(null)
-  // pendingPantry: { id, step: 'ask' | 'category', category } | null
+  const [modal, setModal] = useState(null)
 
   function handleCheckboxClick(item) {
     if (item.checked) {
-      // Uncheck — clear any pending prompt
       onToggle(item.id)
       if (pendingPantry?.id === item.id) setPendingPantry(null)
       return
     }
-    // Check off and open the inline prompt
     onToggle(item.id)
     setPendingPantry({ id: item.id, step: 'ask', category: item.category })
   }
@@ -219,7 +204,6 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
   function handlePantryYes(item) {
     const existing = pantry.find(p => p.name.toLowerCase() === item.name.toLowerCase())
     if (existing) {
-      // Increment quantity and remove from shopping list
       updatePantryItem({
         ...existing,
         quantity: (existing.quantity || 0) + (item.quantity || 1),
@@ -228,13 +212,11 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
       onDelete(item.id)
       setPendingPantry(null)
     } else {
-      // Need category confirmation before adding
       setPendingPantry(prev => ({ ...prev, step: 'category' }))
     }
   }
 
   function handlePantrySkip() {
-    // Item stays checked; just dismiss the prompt
     setPendingPantry(null)
   }
 
@@ -255,6 +237,17 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
     })
     onDelete(item.id)
     setPendingPantry(null)
+  }
+
+  function handleClearAll() {
+    setModal({
+      title: t('clearAll'),
+      body: t('confirmClearShopping')(shoppingList.length),
+      actions: [
+        { label: t('delete'), style: 'danger', onClick: () => { onDeleteAll(); setModal(null) } },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
   }
 
   const unchecked = shoppingList.filter(i => !i.checked)
@@ -287,34 +280,30 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
       <div className="tab-content">
         <div className="page-header">
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <h1 className="page-title">Shopping List</h1>
+            <h1 className="page-title">{t('shoppingTitle')}</h1>
             {shoppingList.length > 0 && (
               <button
-                onClick={() => {
-                  if (window.confirm(`Delete all ${shoppingList.length} shopping items? This cannot be undone.`)) {
-                    onDeleteAll()
-                  }
-                }}
+                onClick={handleClearAll}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
                   fontSize: 13, color: 'var(--color-text-muted)',
                   padding: '2px 0', fontFamily: 'var(--font-body)',
                 }}
               >
-                Clear all
+                {t('clearAll')}
               </button>
             )}
           </div>
           <p className="page-subtitle">
-            {unchecked.length} to get{checked.length > 0 ? ` · ${checked.length} done` : ''}
+            {t('toGet')(unchecked.length)}{checked.length > 0 ? ` · ${checked.length} ${t('done').toLowerCase()}` : ''}
           </p>
         </div>
 
         {shoppingList.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🛒</div>
-            <h3>List is empty</h3>
-            <p>Add items manually or ask the AI assistant</p>
+            <h3>{t('listEmpty')}</h3>
+            <p>{t('listEmptyHint')}</p>
           </div>
         ) : (
           <>
@@ -329,7 +318,7 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
 
             {checked.length > 0 && (
               <>
-                <div className="section-label" style={{ marginTop: 24 }}>✓ Done</div>
+                <div className="section-label" style={{ marginTop: 24 }}>✓ {t('done')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px' }}>
                   {checked.map(renderRow)}
                 </div>
@@ -339,7 +328,7 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
                     style={{ width: '100%', fontSize: 13 }}
                     onClick={() => checked.forEach(i => onDelete(i.id))}
                   >
-                    Clear done items
+                    {t('clearDone')}
                   </button>
                 </div>
               </>
@@ -354,6 +343,15 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
       {showAdd && (
         <AddShoppingModal onClose={() => setShowAdd(false)} onAdd={onAdd} />
       )}
+
+      <AppModal
+        isOpen={!!modal}
+        title={modal?.title}
+        actions={modal?.actions}
+        onClose={() => setModal(null)}
+      >
+        {modal?.body}
+      </AppModal>
     </>
   )
 }
