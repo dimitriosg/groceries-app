@@ -97,26 +97,27 @@ export default function SettingsTab({
   }
 
   function validateNewId(id) {
-    if (!id || id.length < 3 || id.length > 15) return t('idInvalid')
-    if (!/^[a-zA-Z0-9-]+$/.test(id)) return t('idInvalid')
+    if (!/^[a-zA-Z0-9-]{3,15}$/.test(id)) return t('idInvalid')
     return null
   }
 
   function handleChangeId() {
-    const trimmed = newHouseholdId.trim()
-    const err = validateNewId(trimmed)
+    // Strip only leading/trailing whitespace — no other transformation
+    const value = newHouseholdId.trim()
+    const err = validateNewId(value)
     if (err) { setChangeIdError(err); return }
     setChangeIdError('')
     setModal({
       title: t('changeHouseholdId'),
-      body: t('changeHouseholdConfirm')(trimmed),
+      body: t('changeHouseholdConfirm')(value),
       actions: [
         {
           label: t('change'), style: 'primary',
           onClick: async () => {
             setModal(null)
             try {
-              await onChangeHouseholdId(trimmed)
+              console.log('[HouseholdID] saving:', value)
+              await onChangeHouseholdId(value)
               setNewHouseholdId('')
             } catch (err) {
               setChangeIdError(err.message === 'ID_IN_USE' ? t('idInUse') : t('idInvalid'))
@@ -196,7 +197,7 @@ export default function SettingsTab({
       <Section title={t('householdSync')}>
         <Row label={t('yourHouseholdId')}>
           <span style={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 1, color: 'var(--color-text-muted)' }}>
-            {householdId ? householdId.slice(0, 8) : '—'}
+            {householdId ? householdId.slice(0, 12) : '—'}
           </span>
         </Row>
         <Row label={t('inviteCode')}>
