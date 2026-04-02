@@ -483,6 +483,21 @@ export default function SettingsTab({
 
       <div style={{ height: 20 }} />
 
+      <div style={{
+        textAlign: 'center',
+        padding: '24px 20px 8px',
+        color: 'var(--color-text-muted)',
+        fontSize: 12,
+      }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: 13 }}>
+          🥦 Pantry &amp; Groceries
+        </span>
+        <br />
+        <span style={{ letterSpacing: '0.04em' }}>
+          v{__APP_VERSION__}
+        </span>
+      </div>
+
       <AppModal
         isOpen={!!modal}
         title={modal?.title}
