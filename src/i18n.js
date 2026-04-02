@@ -146,6 +146,7 @@ export const translations = {
 
     // Barcode scanner
     barcodeDetected: 'Barcode detected! Looking up...',
+    pointCameraAtBarcode: 'Point camera at a barcode',
 
     // Unit display labels
     units: {
@@ -318,6 +319,7 @@ export const translations = {
 
     // Barcode scanner
     barcodeDetected: 'Βαρκόντ εντοπίστηκε! Αναζήτηση...',
+    pointCameraAtBarcode: 'Στρέψτε την κάμερα σε barcode',
 
     // Unit display labels
     units: {

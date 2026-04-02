@@ -56,6 +56,13 @@ function parseOFFProduct(p, barcode) {
   }
 }
 
+function fetchWithTimeout(url, ms) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  return fetch(url, { signal: controller.signal })
+    .finally(() => clearTimeout(timer))
+}
+
 async function lookupBarcode(barcode, pantry) {
   // 1. Check local pantry first (instant, no network)
   const localMatch = (pantry || []).find(item => item.barcode === barcode)
@@ -73,24 +80,24 @@ async function lookupBarcode(barcode, pantry) {
 
   // 2. Try Greek Open Food Facts first
   try {
-    const grRes = await fetch(
+    const grRes = await fetchWithTimeout(
       `https://gr.openfoodfacts.org/api/v0/product/${barcode}.json`,
-      { signal: AbortSignal.timeout(3000) }
+      3000
     )
     const grData = await grRes.json()
-    if (grData.status === 1 && grData.product?.product_name) {
+    if (grData.status === 1 && (grData.product?.product_name || grData.product?.product_name_el || grData.product?.abbreviated_product_name)) {
       return parseOFFProduct(grData.product, barcode)
     }
   } catch {}
 
   // 3. Fall back to global Open Food Facts
   try {
-    const worldRes = await fetch(
+    const worldRes = await fetchWithTimeout(
       `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
-      { signal: AbortSignal.timeout(4000) }
+      4000
     )
     const worldData = await worldRes.json()
-    if (worldData.status === 1 && worldData.product?.product_name) {
+    if (worldData.status === 1 && (worldData.product?.product_name || worldData.product?.product_name_el || worldData.product?.abbreviated_product_name)) {
       return parseOFFProduct(worldData.product, barcode)
     }
   } catch {}
@@ -109,6 +116,13 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
   const [torchOn, setTorchOn] = useState(false)
   const trackRef = useRef(null)
   const hasScanned = useRef(false)
+  const pantryRef = useRef(pantry)
+  const onResultRef = useRef(onResult)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => { pantryRef.current = pantry }, [pantry])
+  useEffect(() => { onResultRef.current = onResult }, [onResult])
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   useEffect(() => {
     const reader = new BrowserMultiFormatReader(SCAN_HINTS)
@@ -137,10 +151,11 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
         if (result && !hasScanned.current) {
           hasScanned.current = true
           setStatus('detected') // immediate visual feedback
+          await new Promise(resolve => requestAnimationFrame(resolve))
           const barcode = result.getText()
           setStatus('loading')
           try {
-            const product = await lookupBarcode(barcode, pantry)
+            const product = await lookupBarcode(barcode, pantryRef.current)
             setScannedProduct(product)
             setStatus('found')
           } catch {
@@ -231,7 +246,7 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
               }} />
             </div>
             <p style={{ color: status === 'detected' ? '#22c55e' : 'white', fontSize: 14, marginTop: 20, zIndex: 1, opacity: 0.9, fontWeight: status === 'detected' ? 600 : 400 }}>
-              {status === 'detected' ? t('barcodeDetected') : 'Point camera at a barcode'}
+              {status === 'detected' ? t('barcodeDetected') : t('pointCameraAtBarcode')}
             </p>
           </div>
         )}
@@ -327,7 +342,7 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
 }
 
 function ProductResultSheet({ product, onConfirm, onRescan, onClose }) {
-  const { t, tCat } = useTranslation()
+  const { t, tCat, tUnit } = useTranslation()
   const [form, setForm] = useState({
     name: product.name || '',
     brand: product.brand || '',
@@ -415,7 +430,9 @@ function ProductResultSheet({ product, onConfirm, onRescan, onClose }) {
         <div className="form-group">
           <label className="form-label">{t('unitLabel')}</label>
           <select className="form-select" value={form.unit} onChange={e => set('unit', e.target.value)}>
-            {PANTRY_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+            {[...new Set([...(form.unit ? [form.unit] : []), ...PANTRY_UNITS])].map(u => (
+              <option key={u} value={u}>{tUnit(u)}</option>
+            ))}
           </select>
         </div>
       </div>

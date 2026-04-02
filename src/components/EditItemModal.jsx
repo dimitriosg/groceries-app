@@ -77,7 +77,9 @@ export default function EditItemModal({ item, onClose, onSave, onDelete }) {
             <div className="form-group">
               <label className="form-label">{t('unitLabel')}</label>
               <select className="form-select" value={form.unit} onChange={e => set('unit', e.target.value)}>
-                {PANTRY_UNITS.map(u => <option key={u} value={u}>{tUnit(u)}</option>)}
+                {[...new Set([...(form.unit ? [form.unit] : []), ...PANTRY_UNITS])].map(u => (
+                <option key={u} value={u}>{tUnit(u)}</option>
+              ))}
               </select>
             </div>
           </div>
