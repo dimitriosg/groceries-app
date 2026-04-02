@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { CATEGORIES, CATEGORY_ICONS } from '../constants.js'
+import { CATEGORIES, CATEGORY_ICONS, PANTRY_UNITS } from '../constants.js'
 import { useTranslation } from '../hooks/useTranslation.js'
 
-const UNITS = ['units', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'loaf', 'bunch', 'pack']
-
 export default function EditItemModal({ item, onClose, onSave, onDelete }) {
-  const { t } = useTranslation()
+  const { t, tCat, tUnit } = useTranslation()
   const [form, setForm] = useState({
     name: item.name,
     brand: item.brand || '',
@@ -65,7 +63,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete }) {
             <select className="form-select" value={form.category} onChange={e => set('category', e.target.value)}>
               {CATEGORIES.map(cat => (
                 <option key={cat} value={cat}>
-                  {CATEGORY_ICONS[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  {CATEGORY_ICONS[cat]} {tCat(cat)}
                 </option>
               ))}
             </select>
@@ -79,7 +77,9 @@ export default function EditItemModal({ item, onClose, onSave, onDelete }) {
             <div className="form-group">
               <label className="form-label">{t('unitLabel')}</label>
               <select className="form-select" value={form.unit} onChange={e => set('unit', e.target.value)}>
-                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                {[...new Set([...(form.unit ? [form.unit] : []), ...PANTRY_UNITS])].map(u => (
+                <option key={u} value={u}>{tUnit(u)}</option>
+              ))}
               </select>
             </div>
           </div>

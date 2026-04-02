@@ -143,6 +143,33 @@ export const translations = {
     skillLabel1: 'Complete beginner', skillLabel2: 'Getting started',
     skillLabel3: 'Home cook', skillLabel4: 'Experienced cook',
     skillLabel5: 'Advanced home chef',
+
+    // Barcode scanner
+    barcodeDetected: 'Barcode detected! Looking up...',
+    pointCameraAtBarcode: 'Point camera at a barcode',
+
+    // Unit display labels
+    units: {
+      units: 'units', pack: 'pack', g: 'g', kg: 'kg',
+      ml: 'ml', l: 'l', oz: 'oz', lb: 'lb',
+      cups: 'cups', tbsp: 'tbsp', tsp: 'tsp',
+      loaf: 'loaf', bunch: 'bunch',
+    },
+
+    // Category display labels
+    categories: {
+      'produce': 'Produce',
+      'dairy': 'Dairy',
+      'meat & fish': 'Meat & Fish',
+      'dry goods & grains': 'Dry Goods & Grains',
+      'canned & jarred': 'Canned & Jarred',
+      'condiments & sauces': 'Condiments & Sauces',
+      'frozen': 'Frozen',
+      'snacks & sweets': 'Snacks & Sweets',
+      'beverages': 'Beverages',
+      'bakery': 'Bakery',
+      'other': 'Other',
+    },
   },
 
   el: {
@@ -289,5 +316,32 @@ export const translations = {
     skillLabel1: 'Εντελώς αρχάριος', skillLabel2: 'Ξεκινάω',
     skillLabel3: 'Οικιακός μάγειρας', skillLabel4: 'Έμπειρος μάγειρας',
     skillLabel5: 'Προχωρημένος μάγειρας',
+
+    // Barcode scanner
+    barcodeDetected: 'Βαρκόντ εντοπίστηκε! Αναζήτηση...',
+    pointCameraAtBarcode: 'Στρέψτε την κάμερα σε barcode',
+
+    // Unit display labels
+    units: {
+      units: 'τεμάχια', pack: 'πακέτο', g: 'g', kg: 'kg',
+      ml: 'ml', l: 'l', oz: 'oz', lb: 'lb',
+      cups: 'φλιτζάνια', tbsp: 'κ.σ.', tsp: 'κ.γ.',
+      loaf: 'φραντζόλα', bunch: 'ματσάκι',
+    },
+
+    // Category display labels
+    categories: {
+      'produce': 'Φρέσκα Προϊόντα',
+      'dairy': 'Γαλακτοκομικά',
+      'meat & fish': 'Κρέας & Ψάρι',
+      'dry goods & grains': 'Ξηρά & Δημητριακά',
+      'canned & jarred': 'Κονσέρβες & Βάζα',
+      'condiments & sauces': 'Καρυκεύματα & Σάλτσες',
+      'frozen': 'Κατεψυγμένα',
+      'snacks & sweets': 'Σνακ & Γλυκά',
+      'beverages': 'Ποτά',
+      'bakery': 'Αρτοποιείο',
+      'other': 'Άλλο',
+    },
   },
 }

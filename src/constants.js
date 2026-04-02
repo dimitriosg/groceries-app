@@ -1,3 +1,9 @@
+// Simple units for pantry stock tracking
+export const PANTRY_UNITS = ['units', 'pack', 'g', 'kg', 'ml', 'l', 'oz', 'lb']
+
+// Detailed units for recipes and cooking
+export const RECIPE_UNITS = ['units', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'loaf', 'bunch', 'pack']
+
 export const CATEGORIES = [
   'produce',
   'dairy',

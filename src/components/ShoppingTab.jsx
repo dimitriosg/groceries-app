@@ -5,7 +5,7 @@ import AppModal from './AppModal.jsx'
 import { useTranslation } from '../hooks/useTranslation.js'
 
 function AddShoppingModal({ onClose, onAdd }) {
-  const { t } = useTranslation()
+  const { t, tCat } = useTranslation()
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unit, setUnit] = useState('units')
@@ -53,7 +53,7 @@ function AddShoppingModal({ onClose, onAdd }) {
             <label className="form-label">{t('categoryLabel')}</label>
             <select className="form-select" value={category} onChange={e => setCategory(e.target.value)}>
               {CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {tCat(cat)}</option>
               ))}
             </select>
           </div>
@@ -68,7 +68,7 @@ function AddShoppingModal({ onClose, onAdd }) {
 }
 
 function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, onPantrySkip, onCategoryChange, onPantryConfirm }) {
-  const { t } = useTranslation()
+  const { t, tCat } = useTranslation()
   const showPrompt = !!pending
 
   return (
@@ -167,7 +167,7 @@ function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, on
           >
             {CATEGORIES.map(cat => (
               <option key={cat} value={cat}>
-                {CATEGORY_ICONS[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                {CATEGORY_ICONS[cat]} {tCat(cat)}
               </option>
             ))}
           </select>
@@ -186,7 +186,7 @@ function ShoppingRow({ item, onCheckboxClick, onDelete, pending, onPantryYes, on
 }
 
 export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, onDeleteAll, pantry, addPantryItem, updatePantryItem }) {
-  const { t } = useTranslation()
+  const { t, tCat } = useTranslation()
   const [showAdd, setShowAdd] = useState(false)
   const [pendingPantry, setPendingPantry] = useState(null)
   const [modal, setModal] = useState(null)
@@ -309,7 +309,7 @@ export default function ShoppingTab({ shoppingList, onToggle, onDelete, onAdd, o
           <>
             {Object.entries(grouped).map(([category, items]) => (
               <div key={category}>
-                <div className="section-label">{CATEGORY_ICONS[category]} {category}</div>
+                <div className="section-label">{CATEGORY_ICONS[category]} {tCat(category)}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 20px' }}>
                   {items.map(renderRow)}
                 </div>
