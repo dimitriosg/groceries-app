@@ -1,6 +1,6 @@
-import { SYSTEM_PROMPT } from '../constants.js'
+import { getSystemPrompt } from '../constants.js'
 
-export async function callAssistant(userMessage, appState, conversationHistory) {
+export async function callAssistant(userMessage, appState, conversationHistory, lang = 'en') {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('Missing VITE_ANTHROPIC_API_KEY in .env')
 
@@ -20,7 +20,7 @@ ${JSON.stringify(appState, null, 2)}
     body: JSON.stringify({
       model: 'claude-sonnet-4-5',
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: getSystemPrompt(lang),
       messages: [
         ...conversationHistory,
         {

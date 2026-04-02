@@ -107,6 +107,42 @@ export const translations = {
     scanBarcode: 'Scan', addToPantryBtn: 'Add to Pantry',
     joiningHouseholdHint: 'Join a household — paste an invite code from another device:',
     syncing: 'Syncing…',
+
+    // Network status
+    offline: 'Offline', live: 'Live', syncError: 'Sync error',
+    offlineBanner: '⚡ Offline — changes will sync when reconnected',
+
+    // Household members & roles
+    members: 'Members', makeAdmin: 'Make Admin',
+    makeAdminConfirm: (name) => `Make ${name} an admin?`,
+    leaveHousehold: 'Leave household',
+    leaveHouseholdBody: 'Are you sure you want to leave this household? Your local data will remain but you\'ll stop syncing.',
+    leave: 'Leave',
+    changeHouseholdId: 'Change household ID',
+    changeHouseholdHint: 'Changing this will update all connected devices automatically',
+    changeHouseholdConfirm: (id) => `Change household ID to "${id}"?`,
+    change: 'Change',
+    idInUse: 'This ID is already in use',
+    idInvalid: 'Must be 3–15 characters, letters, numbers and hyphens only',
+
+    // Conflict resolution
+    conflictTitle: 'Sync conflict detected',
+    conflictBody: 'Some items were edited on multiple devices. Choose which version to keep:',
+    yours: 'Yours', theirs: 'Theirs',
+    keepMine: 'Keep mine', useTheirs: 'Use theirs',
+    keepAllMine: 'Keep all mine', useAllTheirs: 'Use all theirs',
+    confirmChoices: 'Confirm choices',
+    updatedAt: (t) => `updated ${t}`,
+
+    // Data section
+    deleteAllData: 'Delete all data',
+    deleteAllDataBody: 'This will permanently delete your entire pantry and shopping list. This cannot be undone.',
+    deleteEverything: 'Delete everything',
+
+    // Skill levels (numeric)
+    skillLabel1: 'Complete beginner', skillLabel2: 'Getting started',
+    skillLabel3: 'Home cook', skillLabel4: 'Experienced cook',
+    skillLabel5: 'Advanced home chef',
   },
 
   el: {
@@ -217,5 +253,41 @@ export const translations = {
     scanBarcode: 'Σάρωση', addToPantryBtn: 'Προσθήκη στην αποθήκη',
     joiningHouseholdHint: 'Εισαγωγή σε νοικοκυριό — επικολλήστε κωδικό από άλλη συσκευή:',
     syncing: 'Συγχρονισμός…',
+
+    // Network status
+    offline: 'Εκτός σύνδεσης', live: 'Ζωντανά', syncError: 'Σφάλμα συγχρονισμού',
+    offlineBanner: '⚡ Εκτός σύνδεσης — οι αλλαγές θα συγχρονιστούν μόλις συνδεθείτε',
+
+    // Household members & roles
+    members: 'Μέλη', makeAdmin: 'Ορισμός ως Admin',
+    makeAdminConfirm: (name) => `Ορισμός του ${name} ως admin;`,
+    leaveHousehold: 'Αποχώρηση από νοικοκυριό',
+    leaveHouseholdBody: 'Είστε σίγουροι; Τα τοπικά δεδομένα θα παραμείνουν αλλά θα σταματήσει ο συγχρονισμός.',
+    leave: 'Αποχώρηση',
+    changeHouseholdId: 'Αλλαγή ID νοικοκυριού',
+    changeHouseholdHint: 'Η αλλαγή θα ενημερώσει αυτόματα όλες τις συνδεδεμένες συσκευές',
+    changeHouseholdConfirm: (id) => `Αλλαγή ID νοικοκυριού σε "${id}";`,
+    change: 'Αλλαγή',
+    idInUse: 'Αυτό το ID χρησιμοποιείται ήδη',
+    idInvalid: 'Πρέπει να είναι 3–15 χαρακτήρες, γράμματα, αριθμοί και παύλες',
+
+    // Conflict resolution
+    conflictTitle: 'Εντοπίστηκε σύγκρουση συγχρονισμού',
+    conflictBody: 'Ορισμένα είδη επεξεργάστηκαν σε πολλές συσκευές. Επιλέξτε ποια έκδοση να κρατήσετε:',
+    yours: 'Δική σας', theirs: 'Άλλης συσκευής',
+    keepMine: 'Κράτηση δικής μου', useTheirs: 'Χρήση άλλης',
+    keepAllMine: 'Κράτηση όλων', useAllTheirs: 'Χρήση όλων άλλης',
+    confirmChoices: 'Επιβεβαίωση επιλογών',
+    updatedAt: (t) => `ενημερώθηκε ${t}`,
+
+    // Data section
+    deleteAllData: 'Διαγραφή όλων των δεδομένων',
+    deleteAllDataBody: 'Αυτό θα διαγράψει οριστικά την αποθήκη και τη λίστα αγορών. Δεν μπορεί να αναιρεθεί.',
+    deleteEverything: 'Διαγραφή όλων',
+
+    // Skill levels (numeric)
+    skillLabel1: 'Εντελώς αρχάριος', skillLabel2: 'Ξεκινάω',
+    skillLabel3: 'Οικιακός μάγειρας', skillLabel4: 'Έμπειρος μάγειρας',
+    skillLabel5: 'Προχωρημένος μάγειρας',
   },
 }

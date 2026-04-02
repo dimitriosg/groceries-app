@@ -12,6 +12,15 @@ const QUICK_CHIPS = [
   "Suggest a quick dinner for 2",
 ]
 
+function getInitialGreeting(lang) {
+  return {
+    role: 'assistant',
+    content: lang === 'el'
+      ? 'Γεια! Είμαι ο βοηθός σου στην κουζίνα. Ξέρω τι έχεις στην αποθήκη σου και μπορώ να σε βοηθήσω με μαγείρεμα, αγορές και γεύματα. Τι θα ήθελες να κάνεις;'
+      : "Hi! I'm your kitchen assistant. I know what's in your pantry and can help you cook, shop, and plan meals. What would you like to do?",
+  }
+}
+
 function Message({ msg }) {
   const isUser = msg.role === 'user'
   return (
@@ -91,7 +100,7 @@ export default function AssistantTab({
   convoCounter, setConvoCounter,
   onToast, initialGreeting,
 }) {
-  const { t } = useTranslation()
+  const { t, lang } = useTranslation()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -111,6 +120,10 @@ export default function AssistantTab({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
+  useEffect(() => {
+    setMessages([getInitialGreeting(lang)])
+  }, [lang]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
 
   const send = async (text) => {
@@ -128,7 +141,7 @@ export default function AssistantTab({
         .filter(m => m.role !== 'assistant' || m !== messages[0])
         .map(m => ({ role: m.role, content: m.content }))
 
-      const { displayText, actions } = await callAssistant(trimmed, appState, history)
+      const { displayText, actions } = await callAssistant(trimmed, appState, history, lang)
 
       const assistantMsg = { role: 'assistant', content: displayText, actions }
       setMessages(prev => [...prev, assistantMsg])
@@ -165,7 +178,7 @@ export default function AssistantTab({
     const name = `#${newCount}_${dateStr}_${timeStr}`
     const newConvo = { id: newCount, name, messages, savedAt: now.toISOString() }
     setSavedConvos(prev => [...prev, newConvo])
-    setMessages([initialGreeting])
+    setMessages([getInitialGreeting(lang)])
     onToast(t('convoSaved'))
     return true
   }
@@ -194,7 +207,7 @@ export default function AssistantTab({
         },
         {
           label: t('discardAndNew'), style: 'danger',
-          onClick: () => { setMessages([initialGreeting]); setModal(null) },
+          onClick: () => { setMessages([getInitialGreeting(lang)]); setModal(null) },
         },
         { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
       ],

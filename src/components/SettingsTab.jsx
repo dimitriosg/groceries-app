@@ -1,25 +1,53 @@
-import { useState, useContext } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { useTranslation } from '../hooks/useTranslation.js'
 import { LangContext } from '../LangContext.jsx'
+import { fetchMembers, promoteToAdmin } from '../utils/sync.js'
 import AppModal from './AppModal.jsx'
 
 const CUISINES = [
-  'Italian', 'Asian', 'Mediterranean', 'Mexican',
-  'Middle Eastern', 'French', 'Indian', 'American', 'Greek',
+  'Greek', 'Italian', 'Mediterranean', 'Asian', 'Japanese', 'Chinese', 'Thai',
+  'Indian', 'Middle Eastern', 'Mexican', 'Brazilian', 'LATAM', 'American', 'French', 'Spanish',
+  'Turkish', 'Lebanese', 'Moroccan', 'Vietnamese', 'Korean', 'British', 'Eastern European',
 ]
 
-const SKILL_LEVEL_KEYS = ['beginner', 'intermediate', 'advanced']
+const SKILL_LEVELS = [
+  { value: 1, label: 'skillLabel1', color: '#22c55e' },
+  { value: 2, label: 'skillLabel2', color: '#84cc16' },
+  { value: 3, label: 'skillLabel3', color: '#EAB308' },
+  { value: 4, label: 'skillLabel4', color: '#F97316' },
+  { value: 5, label: 'skillLabel5', color: '#EF4444' },
+]
 
-export default function SettingsTab({ preferences, onUpdate, onResetData, householdId, onJoinHousehold, onSyncNow }) {
+const SKILL_LEVEL_MAP = { 1: 'beginner', 2: 'beginner', 3: 'intermediate', 4: 'advanced', 5: 'advanced' }
+
+export default function SettingsTab({
+  preferences, onUpdate, onResetData,
+  householdId, onJoinHousehold, onSyncNow,
+  myMember, online, onLeaveHousehold, onChangeHouseholdId, onDeleteAllData,
+}) {
   const { t } = useTranslation()
   const { setLang, lang } = useContext(LangContext)
   const [joinInput, setJoinInput] = useState('')
   const [copied, setCopied] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState('')
   const [modal, setModal] = useState(null)
+  const [members, setMembers] = useState([])
+  const [newHouseholdId, setNewHouseholdId] = useState('')
+  const [changeIdError, setChangeIdError] = useState('')
+
+  const isAdmin = myMember?.role?.startsWith('admin')
+
+  useEffect(() => {
+    if (!householdId) return
+    fetchMembers(householdId).then(data => setMembers(data || []))
+  }, [householdId])
 
   function update(key, value) {
     onUpdate({ ...preferences, [key]: value })
+  }
+
+  function handleSkillChange(value) {
+    onUpdate({ ...preferences, skillLevelNumeric: value, skillLevel: SKILL_LEVEL_MAP[value] })
   }
 
   function toggleCuisine(cuisine) {
@@ -28,6 +56,91 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
       ? current.filter(c => c !== cuisine)
       : [...current, cuisine]
     update('cuisines', next)
+  }
+
+  function isRecentlyActive(member) {
+    if (!member.last_seen) return false
+    return (Date.now() - new Date(member.last_seen).getTime()) < 5 * 60 * 1000
+  }
+
+  function handleMakeAdmin(member) {
+    setModal({
+      title: t('makeAdmin'),
+      body: t('makeAdminConfirm')(member.display_name),
+      actions: [
+        {
+          label: t('makeAdmin'), style: 'primary',
+          onClick: async () => {
+            await promoteToAdmin(member.id, householdId)
+            const updated = await fetchMembers(householdId)
+            setMembers(updated || [])
+            setModal(null)
+          },
+        },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
+  }
+
+  function handleLeave() {
+    setModal({
+      title: t('leaveHousehold'),
+      body: t('leaveHouseholdBody'),
+      actions: [
+        {
+          label: t('leave'), style: 'danger',
+          onClick: async () => { await onLeaveHousehold(); setModal(null) },
+        },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
+  }
+
+  function validateNewId(id) {
+    if (!/^[a-zA-Z0-9-]{3,15}$/.test(id)) return t('idInvalid')
+    return null
+  }
+
+  function handleChangeId() {
+    // Strip only leading/trailing whitespace — no other transformation
+    const value = newHouseholdId.trim()
+    const err = validateNewId(value)
+    if (err) { setChangeIdError(err); return }
+    setChangeIdError('')
+    setModal({
+      title: t('changeHouseholdId'),
+      body: t('changeHouseholdConfirm')(value),
+      actions: [
+        {
+          label: t('change'), style: 'primary',
+          onClick: async () => {
+            setModal(null)
+            try {
+              console.log('[HouseholdID] saving:', value)
+              await onChangeHouseholdId(value)
+              setNewHouseholdId('')
+            } catch (err) {
+              setChangeIdError(err.message === 'ID_IN_USE' ? t('idInUse') : t('idInvalid'))
+            }
+          },
+        },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
+  }
+
+  function handleDeleteAllData() {
+    setModal({
+      title: t('deleteAllData'),
+      body: t('deleteAllDataBody'),
+      actions: [
+        {
+          label: t('deleteEverything'), style: 'danger',
+          onClick: async () => { await onDeleteAllData(); setModal(null) },
+        },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
   }
 
   function handleReset() {
@@ -71,6 +184,9 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
     setTimeout(() => setSyncFeedback(''), 3000)
   }
 
+  const currentSkill = preferences.skillLevelNumeric ?? 3
+  const currentSkillLevel = SKILL_LEVELS.find(s => s.value === currentSkill) ?? SKILL_LEVELS[2]
+
   return (
     <div className="tab-content">
       <div className="page-header">
@@ -81,7 +197,7 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
       <Section title={t('householdSync')}>
         <Row label={t('yourHouseholdId')}>
           <span style={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 1, color: 'var(--color-text-muted)' }}>
-            {householdId ? householdId.slice(0, 8) : '—'}
+            {householdId ? householdId.slice(0, 12) : '—'}
           </span>
         </Row>
         <Row label={t('inviteCode')}>
@@ -119,7 +235,7 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
           <button
             className="btn btn-ghost"
             style={{ fontSize: 13, padding: '5px 12px' }}
-            disabled={syncFeedback === 'syncing'}
+            disabled={syncFeedback === 'syncing' || !online}
             onClick={handleSyncNow}
           >
             {syncFeedback === 'syncing' ? t('syncing') : t('syncNow')}
@@ -132,6 +248,93 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
           )}
         </div>
       </Section>
+
+      {/* ── Members ── */}
+      {members.length > 0 && (
+        <Section title={t('members')}>
+          {members.map((member, idx) => (
+            <Row
+              key={member.id}
+              label={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
+                    background: isRecentlyActive(member) ? '#22c55e' : '#D1D5DB',
+                  }} />
+                  <span>{member.display_name}</span>
+                  {member.id === myMember?.id && (
+                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>(you)</span>
+                  )}
+                </div>
+              }
+              last={idx === members.length - 1 && members.length <= 1}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                  {member.role}
+                </span>
+                {isAdmin && member.id !== myMember?.id && !member.role.startsWith('admin') && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    onClick={() => handleMakeAdmin(member)}
+                  >
+                    {t('makeAdmin')}
+                  </button>
+                )}
+              </div>
+            </Row>
+          ))}
+          {members.length > 1 && (
+            <Row label={t('leaveHousehold')} last>
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: 13, padding: '5px 12px', color: 'var(--color-expiry)', borderColor: 'var(--color-expiry)' }}
+                onClick={handleLeave}
+              >
+                {t('leave')}
+              </button>
+            </Row>
+          )}
+        </Section>
+      )}
+
+      {/* ── Change Household ID (admins only) ── */}
+      {isAdmin && (
+        <Section title={t('changeHouseholdId')}>
+          <div style={{ padding: '10px 0' }}>
+            <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+              {t('changeHouseholdHint')}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="form-input"
+                style={{ flex: 1, fontFamily: 'monospace', fontSize: 13 }}
+                placeholder="new-household-id"
+                maxLength={15}
+                value={newHouseholdId}
+                onChange={e => { setNewHouseholdId(e.target.value); setChangeIdError('') }}
+              />
+              <button
+                className="btn btn-primary"
+                style={{ flexShrink: 0 }}
+                disabled={!newHouseholdId.trim()}
+                onClick={handleChangeId}
+              >
+                {t('change')}
+              </button>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              {newHouseholdId.length}/15
+            </div>
+            {changeIdError && (
+              <div style={{ fontSize: 12, color: 'var(--color-expiry)', marginTop: 2 }}>
+                {changeIdError}
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
       {/* ── Household ── */}
       <Section title={t('household')}>
@@ -148,26 +351,35 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
         </Row>
 
         <Row label={t('cookingSkill')} last>
-          <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-            {SKILL_LEVEL_KEYS.map(value => (
-              <button
-                key={value}
-                onClick={() => update('skillLevel', value)}
-                style={{
-                  flex: 1,
-                  padding: '7px 0',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: preferences.skillLevel === value ? 'var(--color-primary)' : 'var(--color-surface)',
-                  color: preferences.skillLevel === value ? 'white' : 'var(--color-text)',
-                  transition: 'background 0.15s, color 0.15s',
-                }}
-              >
-                {t(value)}
-              </button>
-            ))}
+          <div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              {SKILL_LEVELS.map(({ value, color }) => {
+                const selected = currentSkill === value
+                return (
+                  <button
+                    key={value}
+                    onClick={() => handleSkillChange(value)}
+                    style={{
+                      width: 44, height: 44,
+                      borderRadius: '50%',
+                      border: `2.5px solid ${selected ? color : 'var(--color-border)'}`,
+                      background: selected ? color : 'var(--color-surface)',
+                      color: selected ? 'white' : 'var(--color-text-muted)',
+                      fontSize: 15, fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {value}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: currentSkillLevel.color, marginTop: 4, fontWeight: 600 }}>
+              {t(currentSkillLevel.label)}
+            </div>
           </div>
         </Row>
       </Section>
@@ -184,8 +396,7 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
                 style={{
                   padding: '6px 14px',
                   borderRadius: 'var(--radius-pill)',
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontSize: 13, fontWeight: 500,
                   border: `1.5px solid ${selected ? 'var(--color-primary)' : 'var(--color-border)'}`,
                   background: selected ? 'var(--color-primary-light)' : 'var(--color-surface)',
                   color: selected ? 'var(--color-primary)' : 'var(--color-text-muted)',
@@ -234,12 +445,9 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
                 key={code}
                 onClick={() => setLang(code)}
                 style={{
-                  flex: 1,
-                  padding: '7px 10px',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  border: 'none',
-                  cursor: 'pointer',
+                  flex: 1, padding: '7px 10px',
+                  fontSize: 13, fontWeight: 500,
+                  border: 'none', cursor: 'pointer',
                   background: lang === code ? 'var(--color-primary)' : 'var(--color-surface)',
                   color: lang === code ? 'white' : 'var(--color-text)',
                   transition: 'background 0.15s, color 0.15s',
@@ -255,13 +463,22 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
 
       {/* ── Data ── */}
       <Section title={t('data')}>
-        <button
-          className="btn btn-ghost"
-          style={{ width: '100%', color: 'var(--color-expiry)', borderColor: 'var(--color-expiry)' }}
-          onClick={handleReset}
-        >
-          {t('resetToSample')}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '6px 0' }}>
+          <button
+            className="btn btn-ghost"
+            style={{ width: '100%', color: 'var(--color-expiry)', borderColor: 'var(--color-expiry)' }}
+            onClick={handleReset}
+          >
+            {t('resetToSample')}
+          </button>
+          <button
+            className="btn btn-ghost"
+            style={{ width: '100%', color: 'var(--color-expiry)', borderColor: 'var(--color-expiry)' }}
+            onClick={handleDeleteAllData}
+          >
+            {t('deleteAllData')}
+          </button>
+        </div>
       </Section>
 
       <div style={{ height: 20 }} />
@@ -305,7 +522,7 @@ function Row({ label, children, last }) {
       padding: '13px 0',
       borderBottom: last ? 'none' : '1px solid var(--color-border)',
     }}>
-      <span style={{ fontSize: 15, fontWeight: 500 }}>{label}</span>
+      <div style={{ fontSize: 15, fontWeight: 500 }}>{label}</div>
       {children}
     </div>
   )
@@ -318,11 +535,8 @@ function Toggle({ checked, onChange }) {
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       style={{
-        width: 44,
-        height: 26,
-        borderRadius: 13,
-        border: 'none',
-        cursor: 'pointer',
+        width: 44, height: 26,
+        borderRadius: 13, border: 'none', cursor: 'pointer',
         background: checked ? 'var(--color-primary)' : 'var(--color-border)',
         position: 'relative',
         transition: 'background 0.2s',
@@ -333,8 +547,7 @@ function Toggle({ checked, onChange }) {
         position: 'absolute',
         top: 3,
         left: checked ? 21 : 3,
-        width: 20,
-        height: 20,
+        width: 20, height: 20,
         borderRadius: '50%',
         background: 'white',
         transition: 'left 0.2s',
