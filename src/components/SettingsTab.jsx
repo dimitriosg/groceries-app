@@ -6,7 +6,7 @@ import AppModal from './AppModal.jsx'
 
 const CUISINES = [
   'Greek', 'Italian', 'Mediterranean', 'Asian', 'Japanese', 'Chinese', 'Thai',
-  'Indian', 'Middle Eastern', 'Mexican', 'American', 'French', 'Spanish',
+  'Indian', 'Middle Eastern', 'Mexican', 'Brazilian', 'LATAM', 'American', 'French', 'Spanish',
   'Turkish', 'Lebanese', 'Moroccan', 'Vietnamese', 'Korean', 'British', 'Eastern European',
 ]
 
