@@ -1,6 +1,6 @@
 # 🥦 Pantry & Groceries
 
-> An AI-powered Progressive Web App for managing your home pantry, shopping lists, and recipes — with real-time cloud sync, barcode scanning, voice input, and full Greek/English support.
+> **v1.0.1** — An AI-powered Progressive Web App for managing your home pantry, shopping lists, and recipes — with real-time cloud sync, barcode scanning, voice input, and full Greek/English support.
 
 ---
 
@@ -41,7 +41,7 @@ All data lives in `localStorage` for instant offline access and can optionally b
 | **Shopping List** | Add items manually or let the AI generate a list for you. Items are organised by category. Check off items and optionally move them straight to the pantry. |
 | **Recipes** | AI-generated recipe cards that know which ingredients you already have. See at a glance what is missing and add those items to the shopping list with one tap. |
 | **AI Assistant** | Chat with Claude (claude-sonnet-4-5). The assistant sees your current pantry, shopping list, and preferences and can update them automatically via structured actions. Save, reload, and manage up to 20 conversation histories. |
-| **Barcode Scanner** | Scan any product barcode with the device camera. Item details are fetched from the [Open Food Facts](https://world.openfoodfacts.org/) API and pre-filled in the add-item form. |
+| **Barcode Scanner** | Scan any product barcode with the device camera. Two-step flow: barcode is detected instantly with visual feedback (green frame + barcode number), then product details are looked up from [Open Food Facts](https://world.openfoodfacts.org/) — Greek endpoint first, global fallback. Results are pre-filled in the add-item form. Includes torch toggle. |
 | **Voice Input** | Use the Web Speech API to speak item names or chat with the assistant hands-free. |
 | **Push Notifications** | Get browser notifications for pantry items that are expiring soon or running low. |
 | **Household Sync** | Real-time sync across devices via Supabase. Share a household by pasting an invite code on another device. Manage members, promote admins, change the household ID, or leave the household. |
@@ -335,23 +335,31 @@ The app ships with full translations for **English (`en`)** and **Greek / Ελλ
 
 - All strings live in `src/i18n.js` as a `translations` object keyed by locale.
 - Components access strings via the `useTranslation` hook which reads `LangContext`.
+- The hook exposes three helpers:
+  - `t(key)` — plain UI strings
+  - `tUnit(key)` — translates stored English unit keys (e.g. `"units"` → `"τεμάχια"`)
+  - `tCat(key)` — translates stored English category keys (e.g. `"dairy"` → `"Γαλακτοκομικά"`)
+- Stored data always uses English keys internally; display labels are translated on the fly.
 - The active language is stored in `localStorage` (`app_lang_v1`) and can be changed at any time under **Settings → Language**.
 
-To add a new language, add a new locale key to the `translations` object in `src/i18n.js` and add the corresponding option to the language selector in `SettingsTab.jsx`.
+To add a new language, add a new locale key (including `units` and `categories` sub-objects) to `src/i18n.js` and add the corresponding option to the language selector in `SettingsTab.jsx`.
 
 ---
 
 ## Roadmap
 
 - [x] Voice input (Web Speech API)
-- [x] Settings screen (cuisine prefs, household size, cooking skill)
+- [x] Settings screen (cuisine prefs, household size, cooking skill 1–5)
 - [x] Cloud sync (Supabase)
 - [x] Push notifications for expiring / low-stock items
-- [x] Barcode scanning + Open Food Facts lookup
-- [x] Household member management (roles, admin promotion, leave)
+- [x] Barcode scanning + Open Food Facts lookup (Greek endpoint first)
+- [x] Two-step barcode detection — instant visual feedback before network lookup
+- [x] Household member management (roles, admin promotion, leave, change ID)
 - [x] Conflict resolution UI for multi-device edits
 - [x] Offline support with sync-on-reconnect banner
-- [x] Full Greek / English i18n
+- [x] Full Greek / English i18n (units + categories translated via tUnit/tCat)
+- [x] Vercel Analytics + Speed Insights
+- [x] App version display in Settings
 - [ ] Check-off shopping items → auto-update pantry quantities
 - [ ] Meal planner / weekly menu view
 - [ ] Nutritional information from barcode scan
