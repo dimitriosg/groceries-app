@@ -97,7 +97,7 @@ export default function SettingsTab({
   }
 
   function validateNewId(id) {
-    if (!id || id.length < 4 || id.length > 64) return t('idInvalid')
+    if (!id || id.length < 3 || id.length > 15) return t('idInvalid')
     if (!/^[a-zA-Z0-9-]+$/.test(id)) return t('idInvalid')
     return null
   }
@@ -310,6 +310,7 @@ export default function SettingsTab({
                 className="form-input"
                 style={{ flex: 1, fontFamily: 'monospace', fontSize: 13 }}
                 placeholder="new-household-id"
+                maxLength={15}
                 value={newHouseholdId}
                 onChange={e => { setNewHouseholdId(e.target.value); setChangeIdError('') }}
               />
@@ -322,8 +323,11 @@ export default function SettingsTab({
                 {t('change')}
               </button>
             </div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              {newHouseholdId.length}/15
+            </div>
             {changeIdError && (
-              <div style={{ fontSize: 12, color: 'var(--color-expiry)', marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--color-expiry)', marginTop: 2 }}>
                 {changeIdError}
               </div>
             )}

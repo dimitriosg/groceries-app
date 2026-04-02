@@ -123,7 +123,7 @@ export const translations = {
     changeHouseholdConfirm: (id) => `Change household ID to "${id}"?`,
     change: 'Change',
     idInUse: 'This ID is already in use',
-    idInvalid: 'ID must be 4–64 characters (letters, numbers, hyphens only)',
+    idInvalid: 'Must be 3–15 characters, letters, numbers and hyphens only',
 
     // Conflict resolution
     conflictTitle: 'Sync conflict detected',
@@ -269,7 +269,7 @@ export const translations = {
     changeHouseholdConfirm: (id) => `Αλλαγή ID νοικοκυριού σε "${id}";`,
     change: 'Αλλαγή',
     idInUse: 'Αυτό το ID χρησιμοποιείται ήδη',
-    idInvalid: 'Το ID πρέπει να έχει 4–64 χαρακτήρες (γράμματα, αριθμοί, παύλες)',
+    idInvalid: 'Πρέπει να είναι 3–15 χαρακτήρες, γράμματα, αριθμοί και παύλες',
 
     // Conflict resolution
     conflictTitle: 'Εντοπίστηκε σύγκρουση συγχρονισμού',
