@@ -2,7 +2,9 @@ import { useState, useCallback } from 'react'
 import { CATEGORY_ICONS } from '../constants.js'
 import AddItemModal from './AddItemModal.jsx'
 import EditItemModal from './EditItemModal.jsx'
+import AppModal from './AppModal.jsx'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition.js'
+import { useTranslation } from '../hooks/useTranslation.js'
 
 function isLowStock(item) {
   return item.quantity <= item.lowStockThreshold
@@ -19,10 +21,10 @@ function isExpired(item) {
   return new Date(item.expiryDate) < new Date()
 }
 
-function formatExpiry(dateStr) {
+function formatExpiry(dateStr, t) {
   const date = new Date(dateStr)
   const days = Math.ceil((date - new Date()) / (1000 * 60 * 60 * 24))
-  if (days < 0) return 'Expired'
+  if (days < 0) return t('expired')
   if (days === 0) return 'Today'
   if (days === 1) return 'Tomorrow'
   if (days <= 7) return `${days}d`
@@ -30,6 +32,7 @@ function formatExpiry(dateStr) {
 }
 
 function PantryCard({ item, onClick }) {
+  const { t } = useTranslation()
   const low = isLowStock(item)
   const expiring = isExpiringSoon(item)
   const expired = isExpired(item)
@@ -54,12 +57,12 @@ function PantryCard({ item, onClick }) {
             </span>
             {(expired || expiring) && (
               <span className="badge badge-expiry">
-                {expired ? '⚠️' : '⏱'} {formatExpiry(item.expiryDate)}
+                {expired ? '⚠️' : '⏱'} {formatExpiry(item.expiryDate, t)}
               </span>
             )}
             {low && !expired && (
               <span className="badge badge-low">
-                ↓ Low
+                ↓ {t('low')}
               </span>
             )}
           </div>
@@ -75,7 +78,6 @@ function PantryCard({ item, onClick }) {
         </div>
       </div>
 
-      {/* Quantity bar */}
       <div style={{ marginTop: 10, height: 3, background: 'var(--color-surface-2)', borderRadius: 2, overflow: 'hidden' }}>
         <div style={{
           height: '100%',
@@ -90,9 +92,11 @@ function PantryCard({ item, onClick }) {
 }
 
 export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteItem, onDeleteAll, onDeleteCategory }) {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState(null)
+  const [modal, setModal] = useState(null)
 
   const handleVoiceSearch = useCallback((text) => setSearch(text), [])
   const { supported: voiceSupported, listening: voiceListening, permissionDenied: micDenied, start: startVoice, stop: stopVoice } = useSpeechRecognition(handleVoiceSearch)
@@ -102,7 +106,6 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
     (i.brand || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  // Group by category
   const grouped = {}
   filtered.forEach(item => {
     if (!grouped[item.category]) grouped[item.category] = []
@@ -113,15 +116,25 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
   const expiringCount = pantry.filter(i => isExpiringSoon(i) || isExpired(i)).length
 
   function handleClearAll() {
-    if (window.confirm(`Delete all ${pantry.length} pantry items? This cannot be undone.`)) {
-      onDeleteAll()
-    }
+    setModal({
+      title: t('clearAll'),
+      body: t('confirmClearAll')(pantry.length),
+      actions: [
+        { label: t('delete'), style: 'danger', onClick: () => { onDeleteAll(); setModal(null) } },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
   }
 
   function handleDeleteCategory(category) {
-    if (window.confirm(`Delete all items in ${category}?`)) {
-      onDeleteCategory(category)
-    }
+    setModal({
+      title: t('clearAll'),
+      body: t('confirmDeleteCategory')(category),
+      actions: [
+        { label: t('delete'), style: 'danger', onClick: () => { onDeleteCategory(category); setModal(null) } },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
   }
 
   return (
@@ -129,7 +142,7 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
       <div className="tab-content">
         <div className="page-header">
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <h1 className="page-title">Pantry</h1>
+            <h1 className="page-title">{t('pantryTitle')}</h1>
             {pantry.length > 0 && (
               <button
                 onClick={handleClearAll}
@@ -139,21 +152,21 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
                   padding: '2px 0', fontFamily: 'var(--font-body)',
                 }}
               >
-                Clear all
+                {t('clearAll')}
               </button>
             )}
           </div>
           <p className="page-subtitle">
-            {pantry.length} items
-            {lowCount > 0 && <span style={{ color: 'var(--color-low-stock)', marginLeft: 8 }}>· {lowCount} low</span>}
-            {expiringCount > 0 && <span style={{ color: 'var(--color-expiry)', marginLeft: 8 }}>· {expiringCount} expiring</span>}
+            {t('itemsCount')(pantry.length)}
+            {lowCount > 0 && <span style={{ color: 'var(--color-low-stock)', marginLeft: 8 }}>{t('lowCount')(lowCount)}</span>}
+            {expiringCount > 0 && <span style={{ color: 'var(--color-expiry)', marginLeft: 8 }}>{t('expiringCount')(expiringCount)}</span>}
           </p>
         </div>
 
         <div className="search-bar">
           <span style={{ fontSize: 16 }}>{voiceListening ? '🎤' : '🔍'}</span>
           <input
-            placeholder={voiceListening ? 'Listening…' : 'Search pantry...'}
+            placeholder={voiceListening ? 'Listening…' : t('searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -187,8 +200,8 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
         {filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🥡</div>
-            <h3>{search ? 'Nothing found' : 'Pantry is empty'}</h3>
-            <p>{search ? `No items matching "${search}"` : 'Tap + to add your first item'}</p>
+            <h3>{search ? t('nothingFound') : t('pantryEmpty')}</h3>
+            <p>{search ? t('nothingFoundHint')(search) : t('pantryEmptyHint')}</p>
           </div>
         ) : (
           Object.entries(grouped).map(([category, items]) => (
@@ -219,7 +232,7 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
         <div style={{ height: 20 }} />
       </div>
 
-      <button className="fab" onClick={() => setShowAdd(true)} title="Add item">
+      <button className="fab" onClick={() => setShowAdd(true)} title={t('addPantryItem')}>
         +
       </button>
 
@@ -238,6 +251,15 @@ export default function PantryTab({ pantry, onAddItem, onUpdateItem, onDeleteIte
           onDelete={() => { onDeleteItem(editItem.id); setEditItem(null) }}
         />
       )}
+
+      <AppModal
+        isOpen={!!modal}
+        title={modal?.title}
+        actions={modal?.actions}
+        onClose={() => setModal(null)}
+      >
+        {modal?.body}
+      </AppModal>
     </>
   )
 }

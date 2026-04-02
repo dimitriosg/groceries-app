@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { v4 as uuid } from 'uuid'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
+import { useTranslation } from './hooks/useTranslation.js'
 import { INITIAL_PANTRY, INITIAL_SHOPPING_LIST, INITIAL_PREFERENCES, INITIAL_RECIPES } from './constants.js'
 import { applyActions } from './utils/actions.js'
 import { requestPermission, checkPantryAlerts, sendNotification } from './utils/notifications.js'
@@ -11,14 +12,15 @@ import ShoppingTab from './components/ShoppingTab.jsx'
 import RecipesTab from './components/RecipesTab.jsx'
 import AssistantTab from './components/AssistantTab.jsx'
 import SettingsTab from './components/SettingsTab.jsx'
+import Toast from './components/Toast.jsx'
 
-const TABS = [
-  { id: 'pantry', label: 'Pantry', icon: '🥦' },
-  { id: 'shopping', label: 'Shopping', icon: '🛒' },
-  { id: 'recipes', label: 'Recipes', icon: '👨‍🍳' },
-  { id: 'assistant', label: 'Assistant', icon: '💬' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' },
-]
+const TAB_IDS = ['pantry', 'shopping', 'recipes', 'assistant', 'settings']
+const TAB_ICONS = { pantry: '🥦', shopping: '🛒', recipes: '👨‍🍳', assistant: '💬', settings: '⚙️' }
+
+const INITIAL_GREETING = {
+  role: 'assistant',
+  content: "Hi! I'm your kitchen assistant. I know what's in your pantry and can help you cook, shop, and plan meals. What would you like to do?",
+}
 
 // status: 'idle' | 'syncing' | 'synced' | 'error'
 function SyncIndicator({ status, shared }) {
@@ -55,6 +57,7 @@ function SyncIndicator({ status, shared }) {
 }
 
 export default function App() {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState('pantry')
   const [pantry, setPantry] = useLocalStorage('pantry_v1', INITIAL_PANTRY)
   const [shoppingList, setShoppingList] = useLocalStorage('shopping_v1', INITIAL_SHOPPING_LIST)
@@ -62,6 +65,18 @@ export default function App() {
   const [preferences, setPreferences] = useLocalStorage('prefs_v1', INITIAL_PREFERENCES)
   const [syncStatus, setSyncStatus] = useState('idle')
   const [householdId, setHouseholdId] = useState(() => getOrCreateHouseholdId())
+
+  // ── Conversation state (lifted so it survives tab switches) ────
+  const [messages, setMessages] = useState([INITIAL_GREETING])
+  const [savedConvos, setSavedConvos] = useLocalStorage('saved_convos_v1', [])
+  const [convoCounter, setConvoCounter] = useLocalStorage('convo_counter_v1', 0)
+
+  // ── Toast ──────────────────────────────────────────────────────
+  const [toast, setToast] = useState(null)
+  function showToast(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2000)
+  }
 
   const debounceRef = useRef(null)
   const pantryRef = useRef(pantry)
@@ -94,7 +109,6 @@ export default function App() {
 
   // ── Supabase: pull + subscribe whenever householdId changes ────
   useEffect(() => {
-    // Initial pull — remote wins if it has data; otherwise seed it from local
     async function init() {
       try {
         setSyncStatus('syncing')
@@ -104,24 +118,20 @@ export default function App() {
         const hasRemoteShopping = Array.isArray(remote.shoppingList) && remote.shoppingList.length > 0
 
         if (hasRemotePantry || hasRemoteShopping) {
-          // Remote has data — use it, overwrite local
           if (hasRemotePantry) { isRemoteUpdateRef.current = true; setPantry(remote.pantry) }
           if (hasRemoteShopping) { isRemoteUpdateRef.current = true; setShoppingList(remote.shoppingList) }
         } else {
-          // Remote is empty — seed it from localStorage so the second device gets our data
           await pushToSupabase(pantryRef.current, shoppingRef.current)
         }
 
         setSyncStatus('synced')
         setTimeout(() => setSyncStatus('idle'), 3000)
       } catch {
-        // Offline — fall back to localStorage silently
         setSyncStatus('idle')
       }
     }
     init()
 
-    // Realtime subscription
     try {
       if (channelRef.current) supabase.removeChannel(channelRef.current)
 
@@ -207,7 +217,6 @@ export default function App() {
     localStorage.setItem('household_id_v1', newId)
     localStorage.setItem('household_joined', 'true')
     setHouseholdId(newId)
-    // Data will be pulled in the householdId effect above
   }
 
   // ── Pantry actions ─────────────────────────────────────────────
@@ -265,6 +274,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
       <SyncIndicator status={syncStatus} shared={isSharedHousehold} />
+      <Toast message={toast} />
 
       <style>{`
         @keyframes sync-pulse {
@@ -311,6 +321,14 @@ export default function App() {
           <AssistantTab
             appState={appState}
             onStateChange={handleStateChange}
+            messages={messages}
+            setMessages={setMessages}
+            savedConvos={savedConvos}
+            setSavedConvos={setSavedConvos}
+            convoCounter={convoCounter}
+            setConvoCounter={setConvoCounter}
+            onToast={showToast}
+            initialGreeting={INITIAL_GREETING}
           />
         )}
         {activeTab === 'settings' && (
@@ -327,16 +345,16 @@ export default function App() {
 
       {/* Tab bar */}
       <nav className="tab-bar">
-        {TABS.map(tab => (
+        {TAB_IDS.map(id => (
           <button
-            key={tab.id}
-            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+            key={id}
+            className={`tab-btn ${activeTab === id ? 'active' : ''}`}
+            onClick={() => setActiveTab(id)}
           >
-            <span className="tab-icon">{tab.icon}</span>
+            <span className="tab-icon">{TAB_ICONS[id]}</span>
             <span>
-              {tab.label}
-              {tab.id === 'shopping' && shoppingBadge > 0 && (
+              {t(id)}
+              {id === 'shopping' && shoppingBadge > 0 && (
                 <span style={{
                   marginLeft: 4,
                   background: 'var(--color-accent)',

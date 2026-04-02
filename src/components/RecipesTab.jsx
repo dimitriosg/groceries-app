@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import AppModal from './AppModal.jsx'
+import { useTranslation } from '../hooks/useTranslation.js'
 
 const SKILL_COLORS = {
   beginner: { bg: '#EAF3EC', text: '#3D7A4F' },
@@ -6,7 +8,8 @@ const SKILL_COLORS = {
   advanced: { bg: '#FFF0EE', text: '#D94F3D' },
 }
 
-function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selected, onToggleSelect }) {
+function RecipeCard({ recipe, pantry, onAddMissing, onDeleteRequest, selecting, selected, onToggleSelect }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
 
   const pantryNames = pantry.map(i => i.name.toLowerCase())
@@ -27,7 +30,6 @@ function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selecte
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        {/* Checkbox (select mode) or expand chevron */}
         {selecting ? (
           <button
             onClick={() => onToggleSelect(recipe.id)}
@@ -56,15 +58,15 @@ function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selecte
               padding: '1px 7px', borderRadius: 4,
               background: skill.bg, color: skill.text,
             }}>
-              {recipe.skillLevel}
+              {t(recipe.skillLevel)}
             </span>
             {hasAll ? (
               <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 4, background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-                ✓ Ready to cook
+                ✓ {t('readyToCook')}
               </span>
             ) : (
               <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 4, background: 'var(--color-low-stock-bg)', color: 'var(--color-low-stock)' }}>
-                {missingIngredients.length} missing
+                {t('missing')(missingIngredients.length)}
               </span>
             )}
           </div>
@@ -73,9 +75,7 @@ function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selecte
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           {!selecting && (
             <button
-              onClick={() => {
-                if (window.confirm(`Delete "${recipe.title}"?`)) onDelete(recipe.id)
-              }}
+              onClick={() => onDeleteRequest(recipe.id, recipe.title)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: 16, color: 'var(--color-text-muted)', padding: '2px 4px',
@@ -103,7 +103,7 @@ function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selecte
         <div style={{ marginTop: 14, borderTop: '1px solid var(--color-border)', paddingTop: 14 }}>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 8 }}>
-              Ingredients
+              {t('ingredients')}
             </div>
             {recipe.ingredients.map((ing, i) => {
               const inPantry = pantryNames.some(p => p.includes(ing.name.toLowerCase()) || ing.name.toLowerCase().includes(p.split(' ')[0]))
@@ -120,7 +120,7 @@ function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selecte
 
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 8 }}>
-              Steps
+              {t('steps')}
             </div>
             {recipe.steps.map((step, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, fontSize: 13, lineHeight: 1.5 }}>
@@ -136,7 +136,7 @@ function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selecte
               style={{ width: '100%', fontSize: 13 }}
               onClick={() => onAddMissing(missingIngredients)}
             >
-              + Add {missingIngredients.length} missing to shopping list
+              {t('addMissingToList')(missingIngredients.length)}
             </button>
           )}
         </div>
@@ -146,8 +146,10 @@ function RecipeCard({ recipe, pantry, onAddMissing, onDelete, selecting, selecte
 }
 
 export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDeleteRecipe, onDeleteRecipes, onDeleteAllRecipes }) {
+  const { t } = useTranslation()
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState([])
+  const [modal, setModal] = useState(null)
 
   function toggleSelect(id) {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -158,18 +160,43 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
     setSelected([])
   }
 
+  function handleDeleteRequest(id, title) {
+    setModal({
+      title: t('delete'),
+      body: t('confirmDeleteRecipe')(title),
+      actions: [
+        { label: t('delete'), style: 'danger', onClick: () => { onDeleteRecipe(id); setModal(null) } },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
+  }
+
   function handleDeleteSelected() {
-    if (window.confirm(`Delete ${selected.length} of ${recipes.length} recipe${selected.length > 1 ? 's' : ''}?`)) {
-      onDeleteRecipes(selected)
-      exitSelectMode()
-    }
+    setModal({
+      title: t('deleteSelected'),
+      body: t('confirmDeleteRecipes')(selected.length),
+      actions: [
+        {
+          label: t('delete'), style: 'danger',
+          onClick: () => { onDeleteRecipes(selected); exitSelectMode(); setModal(null) },
+        },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
   }
 
   function handleClearAll() {
-    if (window.confirm(`Delete all ${recipes.length} recipe${recipes.length > 1 ? 's' : ''}? This cannot be undone.`)) {
-      onDeleteAllRecipes()
-      exitSelectMode()
-    }
+    setModal({
+      title: t('clearAll'),
+      body: t('confirmClearRecipes')(recipes.length),
+      actions: [
+        {
+          label: t('delete'), style: 'danger',
+          onClick: () => { onDeleteAllRecipes(); exitSelectMode(); setModal(null) },
+        },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
   }
 
   const handleAddMissing = (ingredients) => {
@@ -182,7 +209,7 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
     <div className="tab-content">
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <h1 className="page-title">Recipes</h1>
+          <h1 className="page-title">{t('recipesTitle')}</h1>
           <div style={{ display: 'flex', gap: 12 }}>
             {recipes.length > 0 && (
               <>
@@ -196,7 +223,7 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
                     fontFamily: 'var(--font-body)', padding: '2px 0', fontWeight: selecting ? 600 : 400,
                   }}
                 >
-                  {selecting ? 'Done' : 'Select'}
+                  {selecting ? t('done') : t('select')}
                 </button>
                 {!selecting && (
                   <button
@@ -207,7 +234,7 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
                       fontFamily: 'var(--font-body)', padding: '2px 0',
                     }}
                   >
-                    Clear all
+                    {t('clearAll')}
                   </button>
                 )}
               </>
@@ -215,28 +242,28 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
           </div>
         </div>
         <p className="page-subtitle">
-          {recipes.length} recipe{recipes.length !== 1 ? 's' : ''}
+          {t('recipesCount')(recipes.length)}
           {selecting && selected.length > 0 && (
-            <span style={{ color: 'var(--color-primary)', marginLeft: 8 }}>· {selected.length} selected</span>
+            <span style={{ color: 'var(--color-primary)', marginLeft: 8 }}>{t('selectedCount')(selected.length)}</span>
           )}
         </p>
       </div>
 
       {recipes.length > 0 && (
         <div style={{ padding: '8px 20px 12px', background: 'var(--color-primary-light)', margin: '0 20px', borderRadius: 10, fontSize: 13, color: 'var(--color-primary)' }}>
-          💬 Ask the assistant for personalised recipe suggestions based on what you have.
+          💬 {t('askAssistantRecipes')}
         </div>
       )}
 
       {recipes.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">👨‍🍳</div>
-          <h3>No recipes yet</h3>
-          <p>Ask the assistant to suggest recipes based on your pantry</p>
+          <h3>{t('noRecipesYet')}</h3>
+          <p>{t('noRecipesHint')}</p>
         </div>
       ) : (
         <>
-          <div className="section-label" style={{ marginTop: 20 }}>Suggested for you</div>
+          <div className="section-label" style={{ marginTop: 20 }}>{t('suggestedForYou')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {recipes.map(recipe => (
               <RecipeCard
@@ -244,7 +271,7 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
                 recipe={recipe}
                 pantry={pantry}
                 onAddMissing={handleAddMissing}
-                onDelete={onDeleteRecipe}
+                onDeleteRequest={handleDeleteRequest}
                 selecting={selecting}
                 selected={selected.includes(recipe.id)}
                 onToggleSelect={toggleSelect}
@@ -254,7 +281,6 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
         </>
       )}
 
-      {/* Bulk delete action bar */}
       {selecting && selected.length > 0 && (
         <div style={{
           position: 'fixed',
@@ -270,12 +296,21 @@ export default function RecipesTab({ pantry, recipes, onAddToShoppingList, onDel
             style={{ width: '100%', background: 'var(--color-expiry)' }}
             onClick={handleDeleteSelected}
           >
-            Delete {selected.length} of {recipes.length}
+            {t('deleteOf')(selected.length, recipes.length)}
           </button>
         </div>
       )}
 
       <div style={{ height: 20 }} />
+
+      <AppModal
+        isOpen={!!modal}
+        title={modal?.title}
+        actions={modal?.actions}
+        onClose={() => setModal(null)}
+      >
+        {modal?.body}
+      </AppModal>
     </div>
   )
 }

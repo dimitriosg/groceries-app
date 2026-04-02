@@ -1,20 +1,22 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
+import { useTranslation } from '../hooks/useTranslation.js'
+import { LangContext } from '../LangContext.jsx'
+import AppModal from './AppModal.jsx'
 
 const CUISINES = [
   'Italian', 'Asian', 'Mediterranean', 'Mexican',
   'Middle Eastern', 'French', 'Indian', 'American', 'Greek',
 ]
 
-const SKILL_LEVELS = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' },
-]
+const SKILL_LEVEL_KEYS = ['beginner', 'intermediate', 'advanced']
 
 export default function SettingsTab({ preferences, onUpdate, onResetData, householdId, onJoinHousehold, onSyncNow }) {
+  const { t } = useTranslation()
+  const { setLang, lang } = useContext(LangContext)
   const [joinInput, setJoinInput] = useState('')
   const [copied, setCopied] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState('')
+  const [modal, setModal] = useState(null)
 
   function update(key, value) {
     onUpdate({ ...preferences, [key]: value })
@@ -29,15 +31,36 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
   }
 
   function handleReset() {
-    if (window.confirm('Reset pantry and shopping list to sample data? This cannot be undone.')) {
-      onResetData()
-    }
+    setModal({
+      title: t('resetToSample'),
+      body: t('resetConfirm'),
+      actions: [
+        { label: t('resetToSample'), style: 'danger', onClick: () => { onResetData(); setModal(null) } },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
+    })
   }
 
   function handleCopyInviteCode() {
     navigator.clipboard.writeText(householdId).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function handleJoin() {
+    const trimmed = joinInput.trim()
+    if (!trimmed) return
+    setModal({
+      title: t('joinHousehold'),
+      body: t('joinConfirm'),
+      actions: [
+        {
+          label: t('join'), style: 'primary',
+          onClick: () => { onJoinHousehold(trimmed); setJoinInput(''); setModal(null) },
+        },
+        { label: t('cancel'), style: 'ghost', onClick: () => setModal(null) },
+      ],
     })
   }
 
@@ -48,46 +71,37 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
     setTimeout(() => setSyncFeedback(''), 3000)
   }
 
-  function handleJoin() {
-    const trimmed = joinInput.trim()
-    if (!trimmed) return
-    if (window.confirm('This will replace your current pantry and shopping list with the shared household data. Continue?')) {
-      onJoinHousehold(trimmed)
-      setJoinInput('')
-    }
-  }
-
   return (
     <div className="tab-content">
       <div className="page-header">
-        <h1 className="page-title">Settings</h1>
+        <h1 className="page-title">{t('settingsTitle')}</h1>
       </div>
 
       {/* ── Household Sync ── */}
-      <Section title="Household Sync">
-        <Row label="Your household ID">
+      <Section title={t('householdSync')}>
+        <Row label={t('yourHouseholdId')}>
           <span style={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 1, color: 'var(--color-text-muted)' }}>
             {householdId ? householdId.slice(0, 8) : '—'}
           </span>
         </Row>
-        <Row label="Invite code">
+        <Row label={t('inviteCode')}>
           <button
             className="btn btn-ghost"
             style={{ fontSize: 13, padding: '5px 12px' }}
             onClick={handleCopyInviteCode}
           >
-            {copied ? 'Copied!' : 'Copy'}
+            {copied ? t('copied') : t('copy')}
           </button>
         </Row>
         <div style={{ padding: '12px 0', borderTop: '1px solid var(--color-border)' }}>
           <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-            Join a household — paste an invite code from another device:
+            {t('joiningHouseholdHint')}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               className="form-input"
               style={{ flex: 1, fontFamily: 'monospace', fontSize: 13 }}
-              placeholder="Paste household ID…"
+              placeholder={t('joinPlaceholder')}
               value={joinInput}
               onChange={e => setJoinInput(e.target.value)}
             />
@@ -97,7 +111,7 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
               disabled={!joinInput.trim()}
               onClick={handleJoin}
             >
-              Join
+              {t('join')}
             </button>
           </div>
         </div>
@@ -108,20 +122,20 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
             disabled={syncFeedback === 'syncing'}
             onClick={handleSyncNow}
           >
-            {syncFeedback === 'syncing' ? 'Syncing…' : 'Sync now'}
+            {syncFeedback === 'syncing' ? t('syncing') : t('syncNow')}
           </button>
           {syncFeedback === 'done' && (
-            <span style={{ fontSize: 13, color: 'var(--color-primary)' }}>Synced ✓</span>
+            <span style={{ fontSize: 13, color: 'var(--color-primary)' }}>{t('synced')}</span>
           )}
           {syncFeedback === 'error' && (
-            <span style={{ fontSize: 13, color: 'var(--color-expiry)' }}>Failed ✗</span>
+            <span style={{ fontSize: 13, color: 'var(--color-expiry)' }}>{t('syncFailed')}</span>
           )}
         </div>
       </Section>
 
       {/* ── Household ── */}
-      <Section title="Household">
-        <Row label="Household size">
+      <Section title={t('household')}>
+        <Row label={t('householdSize')}>
           <input
             className="form-input"
             type="number"
@@ -133,9 +147,9 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
           />
         </Row>
 
-        <Row label="Cooking skill" last>
+        <Row label={t('cookingSkill')} last>
           <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-            {SKILL_LEVELS.map(({ value, label }) => (
+            {SKILL_LEVEL_KEYS.map(value => (
               <button
                 key={value}
                 onClick={() => update('skillLevel', value)}
@@ -151,7 +165,7 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
                   transition: 'background 0.15s, color 0.15s',
                 }}
               >
-                {label}
+                {t(value)}
               </button>
             ))}
           </div>
@@ -159,7 +173,7 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
       </Section>
 
       {/* ── Cuisine preferences ── */}
-      <Section title="Cuisine preferences">
+      <Section title={t('cuisinePreferences')}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '4px 0' }}>
           {CUISINES.map(cuisine => {
             const selected = (preferences.cuisines || []).includes(cuisine)
@@ -187,8 +201,8 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
       </Section>
 
       {/* ── Defaults ── */}
-      <Section title="Defaults">
-        <Row label="Low stock threshold">
+      <Section title={t('defaults')}>
+        <Row label={t('lowStockThreshold')}>
           <input
             className="form-input"
             type="number"
@@ -199,33 +213,67 @@ export default function SettingsTab({ preferences, onUpdate, onResetData, househ
           />
         </Row>
 
-        <Row label="Voice input">
+        <Row label={t('voiceInput')}>
           <Toggle
             checked={preferences.voiceEnabled ?? false}
             onChange={val => update('voiceEnabled', val)}
           />
         </Row>
 
-        <Row label="Pantry alerts" last>
+        <Row label={t('pantryAlerts')}>
           <Toggle
             checked={preferences.notificationsEnabled ?? true}
             onChange={val => update('notificationsEnabled', val)}
           />
         </Row>
+
+        <Row label={t('language')} last>
+          <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+            {[{ code: 'en', label: 'English' }, { code: 'el', label: 'Ελληνικά' }].map(({ code, label }) => (
+              <button
+                key={code}
+                onClick={() => setLang(code)}
+                style={{
+                  flex: 1,
+                  padding: '7px 10px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: lang === code ? 'var(--color-primary)' : 'var(--color-surface)',
+                  color: lang === code ? 'white' : 'var(--color-text)',
+                  transition: 'background 0.15s, color 0.15s',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Row>
       </Section>
 
       {/* ── Data ── */}
-      <Section title="Data">
+      <Section title={t('data')}>
         <button
           className="btn btn-ghost"
           style={{ width: '100%', color: 'var(--color-expiry)', borderColor: 'var(--color-expiry)' }}
           onClick={handleReset}
         >
-          Reset to sample data
+          {t('resetToSample')}
         </button>
       </Section>
 
       <div style={{ height: 20 }} />
+
+      <AppModal
+        isOpen={!!modal}
+        title={modal?.title}
+        actions={modal?.actions}
+        onClose={() => setModal(null)}
+      >
+        {modal?.body}
+      </AppModal>
     </div>
   )
 }
