@@ -145,7 +145,8 @@ export const translations = {
     skillLabel5: 'Advanced home chef',
 
     // Barcode scanner
-    barcodeDetected: 'Barcode detected! Looking up...',
+    barcodeDetected: '✓ Barcode detected',
+    barcodeSearching: 'Searching...',
     pointCameraAtBarcode: 'Point camera at a barcode',
 
     // Unit display labels
@@ -318,7 +319,8 @@ export const translations = {
     skillLabel5: 'Προχωρημένος μάγειρας',
 
     // Barcode scanner
-    barcodeDetected: 'Βαρκόντ εντοπίστηκε! Αναζήτηση...',
+    barcodeDetected: '✓ Barcode εντοπίστηκε',
+    barcodeSearching: 'Αναζήτηση...',
     pointCameraAtBarcode: 'Στρέψτε την κάμερα σε barcode',
 
     // Unit display labels

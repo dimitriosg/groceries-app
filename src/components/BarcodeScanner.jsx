@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library'
+import { BrowserMultiFormatReader } from '@zxing/browser'
+import { DecodeHintType, BarcodeFormat } from '@zxing/library'
 import { CATEGORIES, PANTRY_UNITS } from '../constants.js'
 import { useTranslation } from '../hooks/useTranslation.js'
 
@@ -110,24 +111,20 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
   const { t } = useTranslation()
   const videoRef = useRef(null)
   const readerRef = useRef(null)
-  const [status, setStatus] = useState('scanning') // scanning | detected | loading | found | error
+  const [status, setStatus] = useState('scanning') // scanning | detected | searching | found | error
   const [errorMsg, setErrorMsg] = useState('')
   const [scannedProduct, setScannedProduct] = useState(null)
+  const [detectedBarcode, setDetectedBarcode] = useState(null)
   const [torchOn, setTorchOn] = useState(false)
   const trackRef = useRef(null)
   const hasScanned = useRef(false)
   const pantryRef = useRef(pantry)
-  const onResultRef = useRef(onResult)
-  const onCloseRef = useRef(onClose)
 
   useEffect(() => { pantryRef.current = pantry }, [pantry])
-  useEffect(() => { onResultRef.current = onResult }, [onResult])
-  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   useEffect(() => {
     const reader = new BrowserMultiFormatReader(SCAN_HINTS)
     readerRef.current = reader
-
     let controls
 
     reader.decodeFromConstraints(
@@ -140,6 +137,7 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
       },
       videoRef.current,
       async (result, err, ctrl) => {
+        // ctrl is the IScannerControls object from @zxing/browser (3rd arg)
         if (!controls && ctrl) {
           controls = ctrl
           const stream = videoRef.current?.srcObject
@@ -150,16 +148,24 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
 
         if (result && !hasScanned.current) {
           hasScanned.current = true
-          setStatus('detected') // immediate visual feedback
-          await new Promise(resolve => requestAnimationFrame(resolve))
           const barcode = result.getText()
-          setStatus('loading')
+
+          // Step 1: show barcode immediately so user can see it
+          setDetectedBarcode(barcode)
+          setStatus('detected')
+
+          // 800ms pause — user sees the barcode number
+          await new Promise(resolve => setTimeout(resolve, 800))
+
+          // Step 2: network lookup
+          setStatus('searching')
           try {
             const product = await lookupBarcode(barcode, pantryRef.current)
             setScannedProduct(product)
             setStatus('found')
           } catch {
             hasScanned.current = false
+            setDetectedBarcode(null)
             setStatus('scanning')
           }
         }
@@ -192,10 +198,12 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
   const handleRescan = () => {
     hasScanned.current = false
     setScannedProduct(null)
+    setDetectedBarcode(null)
     setStatus('scanning')
   }
 
-  const frameColor = status === 'detected' || status === 'loading' ? '#22c55e' : 'white'
+  const isGreen = status === 'detected' || status === 'searching'
+  const frameColor = isGreen ? '#22c55e' : 'white'
 
   return (
     <div style={{
@@ -214,7 +222,7 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
           playsInline
         />
 
-        {/* Scan frame overlay */}
+        {/* Scan frame — scanning + detected states */}
         {(status === 'scanning' || status === 'detected') && (
           <div style={{
             position: 'absolute', inset: 0,
@@ -227,6 +235,7 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
               position: 'relative',
               width: 260, height: 160,
               zIndex: 1,
+              animation: status === 'detected' ? 'framePulse 0.6s ease-in-out infinite' : 'none',
             }}>
               {[
                 { top: 0, left: 0, borderTop: `3px solid ${frameColor}`, borderLeft: `3px solid ${frameColor}` },
@@ -236,37 +245,70 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
               ].map((style, i) => (
                 <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...style }} />
               ))}
-              <div style={{
-                position: 'absolute',
-                left: 4, right: 4,
-                height: 2,
-                background: 'var(--color-primary)',
-                boxShadow: '0 0 8px var(--color-primary)',
-                animation: 'scanLine 2s ease-in-out infinite',
-              }} />
+              {status === 'scanning' && (
+                <div style={{
+                  position: 'absolute',
+                  left: 4, right: 4,
+                  height: 2,
+                  background: 'var(--color-primary)',
+                  boxShadow: '0 0 8px var(--color-primary)',
+                  animation: 'scanLine 2s ease-in-out infinite',
+                }} />
+              )}
             </div>
-            <p style={{ color: status === 'detected' ? '#22c55e' : 'white', fontSize: 14, marginTop: 20, zIndex: 1, opacity: 0.9, fontWeight: status === 'detected' ? 600 : 400 }}>
-              {status === 'detected' ? t('barcodeDetected') : t('pointCameraAtBarcode')}
-            </p>
+
+            {status === 'detected' ? (
+              <div style={{ zIndex: 1, textAlign: 'center', marginTop: 20 }}>
+                <p style={{ color: '#22c55e', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+                  {t('barcodeDetected')}
+                </p>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.08em' }}>
+                  {detectedBarcode}
+                </p>
+              </div>
+            ) : (
+              <p style={{ color: 'white', fontSize: 14, marginTop: 20, zIndex: 1, opacity: 0.9 }}>
+                {t('pointCameraAtBarcode')}
+              </p>
+            )}
           </div>
         )}
 
-        {status === 'loading' && (
+        {/* Searching overlay */}
+        {status === 'searching' && (
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             background: 'rgba(0,0,0,0.7)',
           }}>
-            <div style={{
-              width: 48, height: 48,
-              border: '3px solid rgba(255,255,255,0.2)',
-              borderTop: '3px solid #22c55e',
-              borderRadius: '50%',
-              animation: 'spin 0.7s linear infinite',
-              marginBottom: 12,
-            }} />
-            <p style={{ color: 'white', fontSize: 14 }}>{t('barcodeDetected')}</p>
+            {/* Green frame stays visible during search */}
+            <div style={{ position: 'relative', width: 260, height: 160, marginBottom: 20 }}>
+              {[
+                { top: 0, left: 0, borderTop: '3px solid #22c55e', borderLeft: '3px solid #22c55e' },
+                { top: 0, right: 0, borderTop: '3px solid #22c55e', borderRight: '3px solid #22c55e' },
+                { bottom: 0, left: 0, borderBottom: '3px solid #22c55e', borderLeft: '3px solid #22c55e' },
+                { bottom: 0, right: 0, borderBottom: '3px solid #22c55e', borderRight: '3px solid #22c55e' },
+              ].map((style, i) => (
+                <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...style }} />
+              ))}
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{
+                  width: 40, height: 40,
+                  border: '3px solid rgba(255,255,255,0.2)',
+                  borderTop: '3px solid #22c55e',
+                  borderRadius: '50%',
+                  animation: 'spin 0.7s linear infinite',
+                }} />
+              </div>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.08em', marginBottom: 8 }}>
+              {detectedBarcode}
+            </p>
+            <p style={{ color: 'white', fontSize: 14 }}>{t('barcodeSearching')}</p>
           </div>
         )}
 
@@ -335,6 +377,10 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes framePulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
         }
       `}</style>
     </div>
