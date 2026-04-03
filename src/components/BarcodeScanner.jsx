@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { DecodeHintType, BarcodeFormat } from '@zxing/library'
 import { CATEGORIES, PANTRY_UNITS } from '../constants.js'
@@ -57,14 +57,15 @@ function parseOFFProduct(p, barcode) {
   }
 }
 
-function fetchWithTimeout(url, ms) {
+function fetchWithTimeout(url, ms, signal) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ms)
+  signal?.addEventListener('abort', () => controller.abort())
   return fetch(url, { signal: controller.signal })
     .finally(() => clearTimeout(timer))
 }
 
-async function lookupBarcode(barcode, pantry) {
+async function lookupBarcode(barcode, pantry, signal) {
   // 1. Check local pantry first (instant, no network)
   const localMatch = (pantry || []).find(item => item.barcode === barcode)
   if (localMatch) {
@@ -83,25 +84,31 @@ async function lookupBarcode(barcode, pantry) {
   try {
     const grRes = await fetchWithTimeout(
       `https://gr.openfoodfacts.org/api/v0/product/${barcode}.json`,
-      3000
+      3000,
+      signal
     )
     const grData = await grRes.json()
     if (grData.status === 1 && (grData.product?.product_name || grData.product?.product_name_el || grData.product?.abbreviated_product_name)) {
       return parseOFFProduct(grData.product, barcode)
     }
-  } catch {}
+  } catch (err) {
+    if (err.name === 'AbortError') throw err
+  }
 
   // 3. Fall back to global Open Food Facts
   try {
     const worldRes = await fetchWithTimeout(
       `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
-      4000
+      4000,
+      signal
     )
     const worldData = await worldRes.json()
     if (worldData.status === 1 && (worldData.product?.product_name || worldData.product?.product_name_el || worldData.product?.abbreviated_product_name)) {
       return parseOFFProduct(worldData.product, barcode)
     }
-  } catch {}
+  } catch (err) {
+    if (err.name === 'AbortError') throw err
+  }
 
   // 4. Not found anywhere
   return { name: '', brand: '', category: 'other', quantity: 1, unit: 'units', barcode, source: 'not_found' }
@@ -111,79 +118,120 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
   const { t } = useTranslation()
   const videoRef = useRef(null)
   const readerRef = useRef(null)
-  const [status, setStatus] = useState('scanning') // scanning | detected | searching | found | error
+  const controlsRef = useRef(null)
+  const trackRef = useRef(null)
+  const hasScanned = useRef(false)
+  const pantryRef = useRef(pantry)
+  const abortControllerRef = useRef(null)
+
+  const [status, setStatus] = useState('scanning') // scanning | detected | searching | not_found_pause | found | error
   const [errorMsg, setErrorMsg] = useState('')
   const [scannedProduct, setScannedProduct] = useState(null)
   const [detectedBarcode, setDetectedBarcode] = useState(null)
   const [torchOn, setTorchOn] = useState(false)
-  const trackRef = useRef(null)
-  const hasScanned = useRef(false)
-  const pantryRef = useRef(pantry)
 
   useEffect(() => { pantryRef.current = pantry }, [pantry])
 
-  useEffect(() => {
-    const reader = new BrowserMultiFormatReader(SCAN_HINTS)
-    readerRef.current = reader
-    let controls
+  const startCamera = useCallback(async () => {
+    setTorchOn(false)
+    trackRef.current = null
 
-    reader.decodeFromConstraints(
-      {
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        }
-      },
-      videoRef.current,
-      async (result, err, ctrl) => {
-        // ctrl is the IScannerControls object from @zxing/browser (3rd arg)
-        if (!controls && ctrl) {
-          controls = ctrl
-          const stream = videoRef.current?.srcObject
-          if (stream) {
-            trackRef.current = stream.getVideoTracks()[0]
+    try {
+      const reader = new BrowserMultiFormatReader(SCAN_HINTS)
+      readerRef.current = reader
+
+      reader.decodeFromConstraints(
+        {
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          }
+        },
+        videoRef.current,
+        async (result, err, ctrl) => {
+          // Capture controls on first callback
+          if (!controlsRef.current && ctrl) {
+            controlsRef.current = ctrl
+            const stream = videoRef.current?.srcObject
+            if (stream) trackRef.current = stream.getVideoTracks()[0]
+          }
+
+          if (result && !hasScanned.current) {
+            hasScanned.current = true
+            const barcode = result.getText()
+
+            setDetectedBarcode(barcode)
+            setStatus('detected')
+
+            // Stop camera immediately — before any async work
+            controlsRef.current?.stop()
+            const stream = videoRef.current?.srcObject
+            if (stream) {
+              stream.getTracks().forEach(track => track.stop())
+              videoRef.current.srcObject = null
+            }
+            controlsRef.current = null
+            trackRef.current = null
+
+            // Let React render the detected state before network request
+            await new Promise(resolve => requestAnimationFrame(resolve))
+            setStatus('searching')
+
+            abortControllerRef.current = new AbortController()
+
+            try {
+              const product = await lookupBarcode(
+                barcode,
+                pantryRef.current,
+                abortControllerRef.current.signal
+              )
+
+              if (!product.name) {
+                setScannedProduct(product)
+                setStatus('not_found_pause')
+                await new Promise(resolve => setTimeout(resolve, 1500))
+              } else {
+                setScannedProduct(product)
+              }
+              setStatus('found')
+            } catch (err) {
+              if (err.name === 'AbortError') return
+              hasScanned.current = false
+              setStatus('scanning')
+            }
           }
         }
-
-        if (result && !hasScanned.current) {
-          hasScanned.current = true
-          const barcode = result.getText()
-
-          // Step 1: show barcode immediately so user can see it
-          setDetectedBarcode(barcode)
-          setStatus('detected')
-
-          // 800ms pause — user sees the barcode number
-          await new Promise(resolve => setTimeout(resolve, 800))
-
-          // Step 2: network lookup
-          setStatus('searching')
-          try {
-            const product = await lookupBarcode(barcode, pantryRef.current)
-            setScannedProduct(product)
-            setStatus('found')
-          } catch {
-            hasScanned.current = false
-            setDetectedBarcode(null)
-            setStatus('scanning')
-          }
-        }
-      }
-    ).catch(err => {
-      setErrorMsg(
-        err.message?.includes('Permission')
-          ? 'Camera access denied. Please allow camera access in your browser settings.'
-          : 'Could not start camera. Try reloading the page.'
-      )
+      ).catch(err => {
+        setErrorMsg(
+          err.message?.includes('Permission')
+            ? 'Camera access denied. Please allow camera access in your browser settings.'
+            : 'Could not start camera. Try reloading the page.'
+        )
+        setStatus('error')
+      })
+    } catch (err) {
+      setErrorMsg('Could not start camera. Try reloading the page.')
       setStatus('error')
-    })
-
-    return () => {
-      controls?.stop()
-      readerRef.current = null
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    startCamera()
+    return () => {
+      controlsRef.current?.stop()
+      controlsRef.current = null
+    }
+  }, [startCamera])
+
+  const handleScanAgain = () => {
+    abortControllerRef.current?.abort()
+    hasScanned.current = false
+    setDetectedBarcode(null)
+    setScannedProduct(null)
+    setStatus('scanning')
+    startCamera()
+  }
 
   const toggleTorch = async () => {
     if (!trackRef.current) return
@@ -195,15 +243,7 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
     }
   }
 
-  const handleRescan = () => {
-    hasScanned.current = false
-    setScannedProduct(null)
-    setDetectedBarcode(null)
-    setStatus('scanning')
-  }
-
-  const isGreen = status === 'detected' || status === 'searching'
-  const frameColor = isGreen ? '#22c55e' : 'white'
+  const isSearching = status === 'searching' || status === 'not_found_pause'
 
   return (
     <div style={{
@@ -215,9 +255,13 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
     }}>
       {/* Camera view */}
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+        {/* Video — always in DOM for ZXing, hidden when not scanning */}
         <video
           ref={videoRef}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'found' ? 'none' : 'block' }}
+          style={{
+            width: '100%', height: '100%', objectFit: 'cover',
+            display: (status === 'scanning' || status === 'detected') ? 'block' : 'none',
+          }}
           muted
           playsInline
         />
@@ -238,10 +282,10 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
               animation: status === 'detected' ? 'framePulse 0.6s ease-in-out infinite' : 'none',
             }}>
               {[
-                { top: 0, left: 0, borderTop: `3px solid ${frameColor}`, borderLeft: `3px solid ${frameColor}` },
-                { top: 0, right: 0, borderTop: `3px solid ${frameColor}`, borderRight: `3px solid ${frameColor}` },
-                { bottom: 0, left: 0, borderBottom: `3px solid ${frameColor}`, borderLeft: `3px solid ${frameColor}` },
-                { bottom: 0, right: 0, borderBottom: `3px solid ${frameColor}`, borderRight: `3px solid ${frameColor}` },
+                { top: 0, left: 0, borderTop: '3px solid #22c55e', borderLeft: '3px solid #22c55e' },
+                { top: 0, right: 0, borderTop: '3px solid #22c55e', borderRight: '3px solid #22c55e' },
+                { bottom: 0, left: 0, borderBottom: '3px solid #22c55e', borderLeft: '3px solid #22c55e' },
+                { bottom: 0, right: 0, borderBottom: '3px solid #22c55e', borderRight: '3px solid #22c55e' },
               ].map((style, i) => (
                 <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...style }} />
               ))}
@@ -274,41 +318,51 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
           </div>
         )}
 
-        {/* Searching overlay */}
-        {status === 'searching' && (
+        {/* Searching / not_found_pause overlay */}
+        {isSearching && (
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.7)',
+            background: 'rgba(0,0,0,0.85)',
           }}>
-            {/* Green frame stays visible during search */}
-            <div style={{ position: 'relative', width: 260, height: 160, marginBottom: 20 }}>
-              {[
-                { top: 0, left: 0, borderTop: '3px solid #22c55e', borderLeft: '3px solid #22c55e' },
-                { top: 0, right: 0, borderTop: '3px solid #22c55e', borderRight: '3px solid #22c55e' },
-                { bottom: 0, left: 0, borderBottom: '3px solid #22c55e', borderLeft: '3px solid #22c55e' },
-                { bottom: 0, right: 0, borderBottom: '3px solid #22c55e', borderRight: '3px solid #22c55e' },
-              ].map((style, i) => (
-                <div key={i} style={{ position: 'absolute', width: 24, height: 24, ...style }} />
-              ))}
-              <div style={{
-                position: 'absolute', inset: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <div style={{
-                  width: 40, height: 40,
-                  border: '3px solid rgba(255,255,255,0.2)',
-                  borderTop: '3px solid #22c55e',
-                  borderRadius: '50%',
-                  animation: 'spin 0.7s linear infinite',
-                }} />
-              </div>
-            </div>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.08em', marginBottom: 8 }}>
+            <div style={{
+              width: 48, height: 48,
+              border: '3px solid rgba(255,255,255,0.2)',
+              borderTop: '3px solid white',
+              borderRadius: '50%',
+              animation: 'spin 0.7s linear infinite',
+              marginBottom: 20,
+            }} />
+            <p style={{ color: 'white', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+              {status === 'not_found_pause' ? t('barcodeNotFound') : t('barcodeSearching')}
+            </p>
+            <p style={{
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              marginBottom: 24,
+              letterSpacing: '0.1em',
+            }}>
               {detectedBarcode}
             </p>
-            <p style={{ color: 'white', fontSize: 14 }}>{t('barcodeSearching')}</p>
+            {status === 'searching' && (
+              <button
+                onClick={handleScanAgain}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: 20,
+                  color: 'white',
+                  padding: '8px 20px',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-body)',
+                }}
+              >
+                {t('scanAgain')}
+              </button>
+            )}
           </div>
         )}
 
@@ -325,38 +379,40 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
           </div>
         )}
 
-        {/* Top controls */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          padding: '16px 16px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none', borderRadius: 20,
-              color: 'white', padding: '6px 14px',
-              fontSize: 14, cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            ✕ Cancel
-          </button>
-          <button
-            onClick={toggleTorch}
-            style={{
-              background: torchOn ? 'rgba(255,220,0,0.3)' : 'rgba(255,255,255,0.15)',
-              border: 'none', borderRadius: 20,
-              color: 'white', padding: '6px 14px',
-              fontSize: 14, cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            {torchOn ? '🔦 On' : '🔦 Off'}
-          </button>
-        </div>
+        {/* Top controls — visible when not in found/error state */}
+        {status !== 'found' && status !== 'error' && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0,
+            padding: '16px 16px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
+          }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'rgba(255,255,255,0.15)',
+                border: 'none', borderRadius: 20,
+                color: 'white', padding: '6px 14px',
+                fontSize: 14, cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              ✕ Cancel
+            </button>
+            <button
+              onClick={toggleTorch}
+              style={{
+                background: torchOn ? 'rgba(255,220,0,0.3)' : 'rgba(255,255,255,0.15)',
+                border: 'none', borderRadius: 20,
+                color: 'white', padding: '6px 14px',
+                fontSize: 14, cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              {torchOn ? '🔦 On' : '🔦 Off'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Product result sheet */}
@@ -364,7 +420,7 @@ export default function BarcodeScanner({ onResult, onClose, pantry }) {
         <ProductResultSheet
           product={scannedProduct}
           onConfirm={onResult}
-          onRescan={handleRescan}
+          onRescan={handleScanAgain}
           onClose={onClose}
         />
       )}
@@ -496,7 +552,7 @@ function ProductResultSheet({ product, onConfirm, onRescan, onClose }) {
 
       <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
         <button className="btn btn-ghost" style={{ flex: 0 }} onClick={onRescan}>
-          🔄 Rescan
+          🔄 {t('scanAgain')}
         </button>
         <button
           className="btn btn-primary"
