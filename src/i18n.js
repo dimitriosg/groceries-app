@@ -146,7 +146,9 @@ export const translations = {
 
     // Barcode scanner
     barcodeDetected: '✓ Barcode detected',
-    barcodeSearching: 'Searching...',
+    barcodeSearching: 'Looking up product...',
+    barcodeNotFound: 'Product not found — you can add it manually',
+    scanAgain: 'Scan again',
     pointCameraAtBarcode: 'Point camera at a barcode',
 
     // Unit display labels
@@ -320,7 +322,9 @@ export const translations = {
 
     // Barcode scanner
     barcodeDetected: '✓ Barcode εντοπίστηκε',
-    barcodeSearching: 'Αναζήτηση...',
+    barcodeSearching: 'Αναζήτηση προϊόντος...',
+    barcodeNotFound: 'Το προϊόν δεν βρέθηκε — μπορείτε να το προσθέσετε χειροκίνητα',
+    scanAgain: 'Νέα σάρωση',
     pointCameraAtBarcode: 'Στρέψτε την κάμερα σε barcode',
 
     // Unit display labels
