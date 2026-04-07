@@ -1,6 +1,6 @@
 # 🥦 Pantry & Groceries
 
-> **v1.0.1** — An AI-powered Progressive Web App for managing your home pantry, shopping lists, and recipes — with real-time cloud sync, barcode scanning, voice input, and full Greek/English support.
+> **v1.0.2** — An AI-powered Progressive Web App for managing your home pantry, shopping lists, and recipes — with real-time cloud sync, barcode scanning, voice input, and full Greek/English support.
 
 ---
 
@@ -41,7 +41,7 @@ All data lives in `localStorage` for instant offline access and can optionally b
 | **Shopping List** | Add items manually or let the AI generate a list for you. Items are organised by category. Check off items and optionally move them straight to the pantry. |
 | **Recipes** | AI-generated recipe cards that know which ingredients you already have. See at a glance what is missing and add those items to the shopping list with one tap. |
 | **AI Assistant** | Chat with Claude (claude-sonnet-4-5). The assistant sees your current pantry, shopping list, and preferences and can update them automatically via structured actions. Save, reload, and manage up to 20 conversation histories. |
-| **Barcode Scanner** | Scan any product barcode with the device camera. Two-step flow: barcode is detected instantly with visual feedback (green frame + barcode number), then product details are looked up from [Open Food Facts](https://world.openfoodfacts.org/) — Greek endpoint first, global fallback. Results are pre-filled in the add-item form. Includes torch toggle. |
+| **Barcode Scanner** | Scan any product barcode with the device camera. Two-step flow: camera stops the moment a barcode is detected (green frame + barcode number), then product details are looked up from [Open Food Facts](https://world.openfoodfacts.org/) — Greek endpoint first, global fallback. If the product is not found, a clear message is shown and you can add it manually or tap **Scan again** to restart. Lookups are cancellable via AbortController so tapping *Scan again* mid-request is safe. Results are pre-filled in the add-item form. Includes torch toggle. |
 | **Voice Input** | Use the Web Speech API to speak item names or chat with the assistant hands-free. |
 | **Push Notifications** | Get browser notifications for pantry items that are expiring soon or running low. |
 | **Household Sync** | Real-time sync across devices via Supabase. Share a household by pasting an invite code on another device. Manage members, promote admins, change the household ID, or leave the household. |
